@@ -1,0 +1,288 @@
+# =============================================================================
+# SMART FAN COORDINATION ENHANCED - Integration with Airflow Management
+# =============================================================================
+# Enhanced fan coordination scripts that integrate with Phase 9 airflow management
+# These scripts extend the existing fan coordination with airflow-aware logic
+# =============================================================================
+
+# Enhanced Living Room Fan Coordination
+smart_fan_coordination_living_room:
+  alias: "Smart Fan Coordination: Living Room (Airflow Enhanced)"
+  sequence:
+    # Check if airflow management is controlling the fans
+    - variables:
+        airflow_controlling: >-
+          {{ is_state('timer.airflow_circulate_active', 'active') or
+             is_state('timer.airflow_post_cycle_harvest', 'active') }}
+        room_temp: "{{ states('sensor.temphumidsensor1_temperature') | float(70) }}"
+        system_state: "{{ states('input_select.climate_system_state') }}"
+        
+    # If airflow management is active, defer to it
+    - if:
+        - condition: template
+          value_template: "{{ airflow_controlling }}"
+      then:
+        - stop: "Airflow management controlling fan operation"
+    
+    # Otherwise, proceed with existing room fan logic
+    - choose:
+        # HVAC cooling with airflow efficiency consideration
+        - conditions:
+            - condition: template
+              value_template: "{{ system_state == 'Cooling' }}"
+            - condition: numeric_state
+              entity_id: sensor.temphumidsensor1_temperature
+              above: 70
+          sequence:
+            - variables:
+                stratification: "{{ states('sensor.airflow_temperature_stratification') | float(0) }}"
+                base_speed: >-
+                  {% set temp = room_temp %}
+                  {% if temp >= 78 %}
+                    50
+                  {% elif temp >= 74 %}
+                    40
+                  {% elif temp >= 72 %}
+                    30
+                  {% else %}
+                    20
+                  {% endif %}
+                # Adjust speed based on stratification
+                final_speed: >-
+                  {% set speed = base_speed | int %}
+                  {% if stratification >= 3.0 %}
+                    {% set speed = (speed * 1.2) | int | min(50) %}
+                  {% elif stratification >= 2.0 %}
+                    {% set speed = (speed * 1.1) | int | min(50) %}
+                  {% endif %}
+                  
+                  {# HVAC assist mode: coordinate with central system #}
+                  {{ (speed * 0.8) | int | max(20) }}
+                
+            - service: fan.turn_on
+              target:
+                entity_id: fan.living_room_fan
+              data:
+                percentage: "{{ final_speed }}"
+        
+        # Idle system with enhanced comfort logic
+        - conditions:
+            - condition: template
+              value_template: "{{ system_state == 'Idle' }}"
+            - condition: numeric_state
+              entity_id: sensor.temphumidsensor1_temperature
+              above: 74
+          sequence:
+            - variables:
+                harvest_opportunity: "{{ states('sensor.airflow_energy_harvest_opportunity') | float(0) }}"
+                base_speed: >-
+                  {% set temp = room_temp %}
+                  {% if temp >= 78 %}
+                    50
+                  {% elif temp >= 76 %}
+                    45
+                  {% elif temp >= 74 %}
+                    40
+                  {% else %}
+                    30
+                  {% endif %}
+                # Reduce speed if harvest opportunity exists (outdoor cooling potential)
+                final_speed: >-
+                  {% set speed = base_speed | int %}
+                  {% if harvest_opportunity >= 3.0 %}
+                    {% set speed = (speed * 0.8) | int %}  {# Let natural cooling do more work #}
+                  {% endif %}
+                  {{ speed }}
+                
+            - service: fan.turn_on
+              target:
+                entity_id: fan.living_room_fan
+              data:
+                percentage: "{{ final_speed }}"
+        
+        # Turn off fan when not needed
+        - conditions:
+            - condition: or
+              conditions:
+                - condition: numeric_state
+                  entity_id: sensor.temphumidsensor1_temperature
+                  below: 70
+                - condition: template
+                  value_template: "{{ system_state in ['Heating', 'Dehumidifying'] }}"
+          sequence:
+            - service: fan.turn_off
+              target:
+                entity_id: fan.living_room_fan
+  mode: single
+  icon: mdi:fan
+
+# Enhanced Office Fan Coordination
+smart_fan_coordination_office:
+  alias: "Smart Fan Coordination: Office (Airflow Enhanced)"
+  sequence:
+    # Check if airflow management is controlling the fans
+    - variables:
+        airflow_controlling: >-
+          {{ is_state('timer.airflow_circulate_active', 'active') or
+             is_state('timer.airflow_post_cycle_harvest', 'active') }}
+        room_temp: "{{ states('sensor.temphumidsensor9_temperature') | float(70) }}"
+        system_state: "{{ states('input_select.climate_system_state') }}"
+        
+    # If airflow management is active, defer to it
+    - if:
+        - condition: template
+          value_template: "{{ airflow_controlling }}"
+      then:
+        - stop: "Airflow management controlling fan operation"
+    
+    # Otherwise, proceed with enhanced office fan logic
+    - choose:
+        # HVAC cooling with productivity consideration
+        - conditions:
+            - condition: template
+              value_template: "{{ system_state == 'Cooling' }}"
+            - condition: numeric_state
+              entity_id: sensor.temphumidsensor9_temperature
+              above: 72
+          sequence:
+            - variables:
+                stratification: "{{ states('sensor.airflow_temperature_stratification') | float(0) }}"
+                base_speed: >-
+                  {% set temp = room_temp %}
+                  {% if temp >= 78 %}
+                    50
+                  {% elif temp >= 76 %}
+                    42
+                  {% elif temp >= 74 %}
+                    35
+                  {% elif temp >= 72 %}
+                    28
+                  {% else %}
+                    20
+                  {% endif %}
+                # Work hours adjustment with airflow consideration
+                final_speed: >-
+                  {% set speed = base_speed | int %}
+                  {% set hour = now().hour %}
+                  
+                  {# Stratification adjustment #}
+                  {% if stratification >= 3.0 %}
+                    {% set speed = (speed * 1.15) | int | min(50) %}
+                  {% elif stratification >= 2.0 %}
+                    {% set speed = (speed * 1.08) | int | min(50) %}
+                  {% endif %}
+                  
+                  {# Work hours boost #}
+                  {% if 9 <= hour <= 17 and states('binary_sensor.workday_sensor') == 'on' %}
+                    {% set speed = (speed * 1.1) | int | min(50) %}
+                  {% endif %}
+                  
+                  {# HVAC coordination #}
+                  {{ (speed * 0.85) | int | max(15) }}
+                
+            - service: fan.turn_on
+              target:
+                entity_id: fan.office_fan
+              data:
+                percentage: "{{ final_speed }}"
+        
+        # Idle system with work comfort optimization
+        - conditions:
+            - condition: template
+              value_template: "{{ system_state == 'Idle' }}"
+            - condition: numeric_state
+              entity_id: sensor.temphumidsensor9_temperature
+              above: 76
+          sequence:
+            - variables:
+                harvest_opportunity: "{{ states('sensor.airflow_energy_harvest_opportunity') | float(0) }}"
+                circulation_efficiency: "{{ states('sensor.airflow_circulation_efficiency') | int(100) }}"
+                base_speed: >-
+                  {% set temp = room_temp %}
+                  {% if temp >= 78 %}
+                    50
+                  {% elif temp >= 76 %}
+                    45
+                  {% else %}
+                    35
+                  {% endif %}
+                # Adjust for circulation efficiency and harvest opportunity
+                final_speed: >-
+                  {% set speed = base_speed | int %}
+                  
+                  {# If poor circulation efficiency, increase local fan speed #}
+                  {% if circulation_efficiency < 60 %}
+                    {% set speed = (speed * 1.15) | int | min(50) %}
+                  {% endif %}
+                  
+                  {# If good harvest opportunity, reduce local fan speed #}
+                  {% if harvest_opportunity >= 3.0 %}
+                    {% set speed = (speed * 0.85) | int %}
+                  {% endif %}
+                  
+                  {{ speed }}
+                
+            - service: fan.turn_on
+              target:
+                entity_id: fan.office_fan
+              data:
+                percentage: "{{ final_speed }}"
+        
+        # Turn off fan when not needed
+        - conditions:
+            - condition: or
+              conditions:
+                - condition: numeric_state
+                  entity_id: sensor.temphumidsensor9_temperature
+                  below: 72
+                - condition: template
+                  value_template: "{{ system_state in ['Heating', 'Dehumidifying'] }}"
+          sequence:
+            - service: fan.turn_off
+              target:
+                entity_id: fan.office_fan
+  mode: single
+  icon: mdi:fan
+
+# Airflow System Status Dashboard Script
+airflow_dashboard_update:
+  alias: "Airflow: Dashboard Update"
+  sequence:
+    - variables:
+        efficiency: "{{ states('sensor.airflow_circulation_efficiency') }}"
+        stratification: "{{ states('sensor.airflow_temperature_stratification') }}"
+        harvest_opportunity: "{{ states('sensor.airflow_energy_harvest_opportunity') }}"
+        circulation_mode: "{{ states('input_select.airflow_circulation_mode') }}"
+        circulate_active: "{{ is_state('timer.airflow_circulate_active', 'active') }}"
+        harvest_active: "{{ is_state('timer.airflow_post_cycle_harvest', 'active') }}"
+        
+    # Update input text helpers for dashboard display (if they exist)
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.airflow_status_summary
+      data:
+        value: >
+          Mode: {{ circulation_mode }} | 
+          Efficiency: {{ efficiency }}% | 
+          Stratification: {{ stratification }}°F |
+          {% if circulate_active %}
+            🌪️ Circulating
+          {% elif harvest_active %}
+            ⚡ Harvesting
+          {% else %}
+            💤 Idle
+          {% endif %}
+      continue_on_error: true  # In case the input_text doesn't exist yet
+  mode: single
+  icon: mdi:view-dashboard
+
+# =============================================================================
+# INPUT TEXT HELPERS FOR DASHBOARD DISPLAY (OPTIONAL)
+# =============================================================================
+# These can be added to customize.yaml if dashboard display is desired
+# input_text:
+#   airflow_status_summary:
+#     name: "Airflow System Status"
+#     max: 255
+#     initial: "Initializing airflow management..."
+

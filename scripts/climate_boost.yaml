@@ -1,0 +1,260 @@
+# TWO-HOUR CLIMATE BOOST SCRIPT - PHASE 2 DEPLOYMENT
+# Temporary aggressive cooling for rapid comfort restoration
+
+climate_boost:
+  alias: "Climate: Two-Hour Boost"
+  description: "Temporary aggressive cooling for rapid comfort restoration"
+  icon: mdi:snowflake-thermometer
+  mode: restart
+  
+  fields:
+    duration_hours:
+      description: "Duration of climate boost in hours"
+      example: 2
+      default: 2
+      selector:
+        number:
+          min: 0.5
+          max: 6
+          step: 0.5
+          unit_of_measurement: "hours"
+    
+    temperature_offset:
+      description: "Temperature offset from current target (negative for cooling)"
+      example: -2
+      default: -2
+      selector:
+        number:
+          min: -5
+          max: 5
+          step: 0.5
+          unit_of_measurement: "°F"
+    
+    source:
+      description: "Source that triggered the boost (for logging)"
+      example: "manual_activation"
+      default: "manual"
+    
+    enable_dehumidification:
+      description: "Enable enhanced dehumidification during boost"
+      example: true
+      default: true
+      selector:
+        boolean:
+
+  variables:
+    # Current system state
+    current_target: "{{ states('input_number.foundation_cooling_target_home') | float(74) }}"
+    current_temp: "{{ states('sensor.average_house_temperature_enhanced_15_sensor') | float(75) }}"
+    current_humidity: "{{ states('sensor.average_house_humidity_enhanced_15_sensor') | float(50) }}"
+    
+    # Boost calculations
+    boost_target: "{{ (current_target + (temperature_offset | float(-2))) | round(1) }}"
+    boost_duration_minutes: "{{ (duration_hours | float(2) * 60) | int }}"
+    
+    # Safety checks
+    min_safe_temp: 68  # Minimum safe cooling temperature
+    max_safe_temp: 80  # Maximum safe heating temperature
+    safe_boost_target: >
+      {% set calculated_target = boost_target | float(72) %}
+      {% if temperature_offset | float(-2) < 0 %}
+        {{ [calculated_target, min_safe_temp] | max }}
+      {% else %}
+        {{ [calculated_target, max_safe_temp] | min }}
+      {% endif %}
+    
+    # Energy efficiency context
+    outdoor_temp: "{{ state_attr('weather.forecast_home', 'temperature') | float(80) }}"
+    efficiency_impact: >
+      {% set temp_delta = (outdoor_temp | float(80)) - (safe_boost_target | float(72)) %}
+      {% if temp_delta > 20 %}
+        high_impact
+      {% elif temp_delta > 15 %}
+        moderate_impact
+      {% elif temp_delta > 10 %}
+        low_impact
+      {% else %}
+        minimal_impact
+      {% endif %}
+
+  sequence:
+    # Pre-boost validation and setup
+    - variables:
+        boost_start_time: "{{ now() }}"
+        boost_end_time: "{{ now() + timedelta(minutes=boost_duration_minutes) }}"
+        original_mode: "{{ states('climate.thermostat') }}"
+
+    # Store boost state for extension/restart scenarios
+    # Only save original state if this is a fresh boost (not an extension)
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ source != 'mobile_extension' or not is_state('input_boolean.climate_boost_active', 'on') }}"
+          sequence:
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.climate_boost_original_target
+              data:
+                value: "{{ current_target }}"
+                
+            - action: input_text.set_value
+              target:
+                entity_id: input_text.climate_boost_original_mode
+              data:
+                value: "{{ original_mode }}"
+    
+    # Always update timing for current boost session
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.climate_boost_start_time
+      data:
+        datetime: "{{ boost_start_time }}"
+        
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.climate_boost_end_time
+      data:
+        datetime: "{{ boost_end_time }}"
+
+    # Safety validation
+    - condition: template
+      value_template: >
+        {{ safe_boost_target >= min_safe_temp and safe_boost_target <= max_safe_temp }}
+      alias: "Validate boost target is within safe range"
+
+    # Enable boost mode flags
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.climate_boost_active
+    
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.hvac_fast_response_mode
+
+    # Activation notification
+    - action: notify.mobile_app_drews_iphone
+      data:
+        title: >
+          {% if source == 'mobile_extension' %}
+          ⏰ Climate Boost EXTENDED
+          {% else %}
+          ❄️ Climate Boost ACTIVATED
+          {% endif %}
+        message: >
+          {% if source == 'mobile_extension' %}
+          Extended boost session - {{ duration_hours }} hours total
+          {% else %}
+          {{ duration_hours }}-hour climate boost started
+          {% endif %}
+          
+          🌡️ Target: {{ states('input_text.climate_boost_original_target') }}°F → {{ safe_boost_target }}°F
+          📊 Current: {{ current_temp }}°F
+          💧 Humidity: {{ current_humidity }}%
+          🌤️ Outdoor: {{ outdoor_temp }}°F
+          
+          ⚡ Energy impact: {{ efficiency_impact.replace('_', ' ') | title }}
+          ⏰ Completion: {{ boost_end_time.strftime('%I:%M %p') }}
+          
+          Source: {{ source }}
+        data:
+          tag: "climate_boost_start"
+          group: "climate_control"
+          actions:
+            - action: "CANCEL_CLIMATE_BOOST"
+              title: "Cancel Boost"
+            - action: "EXTEND_CLIMATE_BOOST"
+              title: "Extend +1 Hour"
+
+    # Apply boost settings
+    - action: climate.set_temperature
+      target:
+        entity_id: climate.thermostat
+      data:
+        temperature: "{{ safe_boost_target }}"
+
+    # Set appropriate HVAC mode
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: climate.thermostat
+      data:
+        hvac_mode: >
+          {% if temperature_offset | float(-2) < 0 %}
+            cool
+          {% elif temperature_offset | float(-2) > 0 %}
+            heat
+          {% else %}
+            auto
+          {% endif %}
+
+    # Enhanced dehumidification if enabled and cooling
+    - condition: template
+      value_template: >
+        {{ enable_dehumidification | default(true) and temperature_offset | float(-2) < 0 and current_humidity > 55 }}
+    - action: switch.turn_on
+      target:
+        entity_id: switch.dehumidifier_relay_l1
+
+    # Boost runtime delay
+    - delay:
+        minutes: "{{ boost_duration_minutes }}"
+
+    # Restoration phase
+    - action: notify.mobile_app_drews_iphone
+      data:
+        title: "✅ Climate Boost Complete"
+        message: >
+          {{ duration_hours }}-hour boost finished
+          
+          🌡️ Restoring to: {{ states('input_text.climate_boost_original_target') }}°F
+          📊 Achieved: {{ states('sensor.average_house_temperature_enhanced_15_sensor') }}°F
+          💧 Final humidity: {{ states('sensor.average_house_humidity_enhanced_15_sensor') }}%
+          
+          {% set temp_change = (states('input_text.climate_boost_original_target') | float(75)) - (states('sensor.average_house_temperature_enhanced_15_sensor') | float(75)) %}
+          {% if temp_change | abs > 1 %}
+          🎯 Temperature change: {{ temp_change | round(1) }}°F
+          {% else %}
+          🎯 Temperature stable
+          {% endif %}
+        data:
+          tag: "climate_boost_complete"
+
+    # Restore original settings
+    - action: climate.set_temperature
+      target:
+        entity_id: climate.thermostat
+      data:
+        temperature: "{{ states('input_text.climate_boost_original_target') }}"
+
+    - action: climate.set_hvac_mode
+      target:
+        entity_id: climate.thermostat
+      data:
+        hvac_mode: "{{ states('input_text.climate_boost_original_mode') }}"
+
+    # Disable boost mode flags
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.climate_boost_active
+    
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.hvac_fast_response_mode
+
+    # Optional: Comment helper for user reference
+    # If you want to track boost usage, uncomment the following:
+    # - action: input_text.set_value
+    #   target:
+    #     entity_id: input_text.climate_boost_last_used
+    #   data:
+    #     value: "{{ boost_start_time.strftime('%Y-%m-%d %H:%M') }} - {{ source }}"
+
+    # Log boost activity for analytics
+    - action: logbook.log
+      data:
+        name: "Climate Boost System"
+        message: >
+          {{ duration_hours }}-hour boost completed
+          Target: {{ current_target }}°F → {{ safe_boost_target }}°F
+          Source: {{ source }}
+          Energy impact: {{ efficiency_impact }}
+

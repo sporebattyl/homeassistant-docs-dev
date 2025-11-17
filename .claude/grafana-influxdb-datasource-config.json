@@ -1,0 +1,33 @@
+{
+  "datasources": [
+    {
+      "name": "InfluxDB-HASSBOT",
+      "type": "influxdb",
+      "access": "proxy",
+      "url": "http://localhost:8086",
+      "database": "homeassistant",
+      "user": "homeassistant",
+      "password": "homeassistant",
+      "basicAuth": false,
+      "basicAuthUser": "",
+      "basicAuthPassword": "",
+      "withCredentials": false,
+      "isDefault": true,
+      "jsonData": {
+        "httpMode": "POST",
+        "keepCookies": [],
+        "timeInterval": "10s",
+        "queryTimeout": "60s",
+        "defaultBucket": "homeassistant/autogen",
+        "organization": "homeassistant",
+        "version": "InfluxQL",
+        "httpHeaderName1": "Authorization"
+      },
+      "secureJsonData": {
+        "httpHeaderValue1": "Token your-influxdb-token-here"
+      },
+      "readOnly": false,
+      "editable": true
+    }
+  ]
+}

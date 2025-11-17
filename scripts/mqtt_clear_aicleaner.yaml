@@ -1,0 +1,27 @@
+mqtt_clear_aicleaner_topics:
+  alias: "MQTT: Clear AICleaner Topics"
+  description: "Publishes empty retained payloads to remove old AICleaner discovery/state topics from the broker."
+  mode: single
+  sequence:
+    - variables:
+        topics:
+          - "homeassistant/button/aicleaner/zone_rowan_s_room_analyze/config"
+          - "homeassistant/button/aicleaner/zone_rowan_s_room_camera/config"
+          - "homeassistant/select/aicleaner/system_status/config"
+          - "homeassistant/select/aicleaner/ai_model/config"
+          - "homeassistant/sensor/aicleaner/system_status/state"
+          - "homeassistant/sensor/aicleaner/system_status/attributes"
+          - "homeassistant/sensor/aicleaner/zone_rowan_s_room_tasks/config"
+          - "homeassistant/sensor/aicleaner/zone_rowan_s_room_tasks/state"
+          - "homeassistant/sensor/aicleaner/zone_rowan_s_room_tasks/attributes"
+          - "homeassistant/sensor/aicleaner/zone_rowan_s_room_cleanliness/config"
+          - "homeassistant/sensor/aicleaner/zone_rowan_s_room_cleanliness/state"
+          - "homeassistant/sensor/aicleaner/zone_rowan_s_room_cleanliness/attributes"
+    - repeat:
+        for_each: '{{ topics }}'
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ repeat.item }}"
+              payload: ""
+              retain: true

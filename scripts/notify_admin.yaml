@@ -1,0 +1,117 @@
+# =============================================================================
+# NOTIFY ADMIN SCRIPT - SYSTEM ADMINISTRATOR NOTIFICATION
+# =============================================================================
+# Provides unified notification system for admin alerts across all packages
+# Supports multiple notification channels and severity levels
+# =============================================================================
+
+notify_admin:
+  alias: "Notify Admin"
+  description: "Send notification to system administrator"
+  mode: parallel
+  max: 10
+  fields:
+    title:
+      description: "Notification title"
+      example: "System Alert"
+      required: true
+      selector:
+        text:
+    message:
+      description: "Notification message"
+      example: "Climate system requires attention"
+      required: true
+      selector:
+        text:
+          multiline: true
+    severity:
+      description: "Alert severity level"
+      example: "warning"
+      default: "info"
+      selector:
+        select:
+          options:
+            - "info"
+            - "warning" 
+            - "error"
+            - "critical"
+    tag:
+      description: "Notification tag for grouping"
+      example: "climate_system"
+      default: "system"
+      selector:
+        text:
+    data:
+      description: "Additional notification data (JSON)"
+      example: '{"actions": [{"action": "ACKNOWLEDGE", "title": "Acknowledge"}]}'
+      default: "{}"
+      selector:
+        text:
+          multiline: true
+
+  sequence:
+    - variables:
+        severity_value: "{{ severity | default('info') }}"
+        tag_value: "{{ tag | default('system') }}"
+        severity_emoji: >
+          {% set level = severity_value %}
+          {% if level == 'critical' %}🚨{% elif level == 'error' %}❌{% elif level == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+        notification_data: >
+          {% set level = severity_value %}
+          {% set base_data = dict(
+            tag=tag_value,
+            persistent=level in ['error','critical'],
+            channel='Admin Alerts',
+            importance='high' if level in ['error','critical'] else 'default'
+          ) %}
+          {% if data not in [None, "", "{}", '{}'] %}
+            {% set custom = data if data is mapping else (data | from_json(default={})) %}
+            {{ dict(base_data, **custom) if custom is mapping else base_data }}
+          {% else %}
+            {{ base_data }}
+          {% endif %}
+
+    # Primary notification via mobile app
+    - service: notify.mobile_app_drews_iphone
+      data:
+        title: "{{ severity_emoji }} {{ title }}"
+        message: >
+          [{{ severity_value.upper() }}] {{ message }}
+          
+          Time: {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+          Tag: {{ tag_value }}
+        data: >
+          {{ notification_data }}
+
+    # Log to system logbook for audit trail
+    - service: logbook.log
+      data:
+        name: "Admin Notification"
+        message: >
+          [{{ severity_value.upper() }}] {{ title }}: {{ message }}
+          Tag: {{ tag_value }}
+        entity_id: script.notify_admin
+
+    # For critical alerts, also send persistent notification
+    - if:
+        - condition: template
+          value_template: "{{ severity_value == 'critical' }}"
+      then:
+        - service: persistent_notification.create
+          data:
+            title: "🚨 CRITICAL: {{ title }}"
+            message: >
+              {{ message }}
+              
+              Timestamp: {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+              Tag: {{ tag_value }}
+              
+              This is a critical system alert requiring immediate attention.
+            notification_id: "critical_{{ tag_value }}_{{ now().timestamp() | int }}"
+
+    # Log notification count tracking
+    - service: logbook.log
+      data:
+        name: "Admin Notification Tracking"
+        message: "Notification sent - severity: {{ severity_value }}, tag: {{ tag_value }}"
+        entity_id: script.notify_admin

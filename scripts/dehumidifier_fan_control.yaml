@@ -1,0 +1,174 @@
+- alias: Dehumidifier Fan Run-Off Cycle
+  sequence:
+    # Let fan run for 5 minutes after dehumidifier shuts off
+    - delay:
+        minutes: 5
+    # Now, only set fan to auto if the dehumidifier is STILL off.
+    # This prevents a race condition where the 'ON' automation has already started again.
+    - condition: state
+      entity_id: switch.dehumidifier_relay_l1
+      state: 'off'
+    # Use central fan control to coordinate properly
+    - service: script.central_fan_control
+  mode: single
+  icon: mdi:fan-clock
+
+- alias: Central Fan Control
+  sequence:
+    # ENHANCED PRIORITY-BASED FAN CONTROL - PREVENTS AUTOMATION WARS
+    # Priority Order: 1) HVAC Cooling  2) Dehumidifying  3) Airflow Management  4) Free Cooling  5) Auto
+    
+    # Get current system states including new airflow management
+    - variables:
+        hvac_is_cooling: "{{ is_state_attr('climate.thermostat', 'hvac_action', 'cooling') }}"
+        dehumidifier_running: "{{ is_state('switch.dehumidifier_relay_l1', 'on') }}"
+        free_cooling_active: "{{ is_state('script.free_cooling_mode', 'on') }}"
+        current_fan_mode: "{{ state_attr('climate.thermostat', 'fan_mode') }}"
+        circulate_active: "{{ is_state('timer.airflow_circulate_active', 'active') }}"
+        post_cycle_active: "{{ is_state('timer.airflow_post_cycle_harvest', 'active') }}"
+        airflow_active: "{{ circulate_active or post_cycle_active }}"
+    
+    # PRIORITY 1: HVAC is actively cooling - fan should be ON
+    - if:
+        - condition: template
+          value_template: "{{ hvac_is_cooling }}"
+      then:
+        - if:
+            - condition: template
+              value_template: "{{ current_fan_mode != 'on' }}"
+          then:
+            - service: climate.set_fan_mode
+              target:
+                entity_id: climate.thermostat
+              data:
+                fan_mode: 'on'
+            - service: notify.mobile_app_drews_iphone
+              data:
+                title: "🌬️ Central Fan Control"
+                message: "HVAC cooling active - fan set to ON for air distribution"
+        - stop: "HVAC cooling has highest priority"
+    
+    # PRIORITY 2: Dehumidifier running - fan should be ON  
+    - if:
+        - condition: template
+          value_template: "{{ dehumidifier_running }}"
+      then:
+        - if:
+            - condition: template
+              value_template: "{{ current_fan_mode != 'on' }}"
+          then:
+            - service: climate.set_fan_mode
+              target:
+                entity_id: climate.thermostat
+              data:
+                fan_mode: 'on'
+            - service: notify.mobile_app_drews_iphone
+              data:
+                title: "🌬️ Central Fan Control"  
+                message: "Dehumidifier active - fan set to ON for air circulation"
+        - stop: "Dehumidifier has second priority"
+    
+    # PRIORITY 3: Airflow management active (circulation or post-cycle) - fan should be ON
+    - if:
+        - condition: template
+          value_template: "{{ airflow_active }}"
+      then:
+        - if:
+            - condition: template
+              value_template: "{{ current_fan_mode != 'on' }}"
+          then:
+            - service: climate.set_fan_mode
+              target:
+                entity_id: climate.thermostat
+              data:
+                fan_mode: 'on'
+            - service: notify.mobile_app_drews_iphone
+              data:
+                title: "🌬️ Central Fan Control"
+                message: >
+                  Airflow management active - fan set to ON
+                  {% if circulate_active %}
+                    (Circulation mode)
+                  {% elif post_cycle_active %}
+                    (Post-cycle harvest)
+                  {% endif %}
+        - stop: "Airflow management has third priority"
+    
+    # PRIORITY 4: Free cooling mode - fan should be ON
+    - if:
+        - condition: template
+          value_template: "{{ free_cooling_active }}"
+      then:
+        - if:
+            - condition: template
+              value_template: "{{ current_fan_mode != 'on' }}"
+          then:
+            - service: climate.set_fan_mode
+              target:
+                entity_id: climate.thermostat
+              data:
+                fan_mode: 'on'
+            - service: notify.mobile_app_drews_iphone
+              data:
+                title: "🌬️ Central Fan Control"
+                message: "Free cooling active - fan set to ON for night purge"
+        - stop: "Free cooling has fourth priority"
+    
+    # PRIORITY 5: Default - fan should be AUTO (no active systems)
+    - if:
+        - condition: template
+          value_template: "{{ current_fan_mode != 'auto' }}"
+      then:
+        - service: climate.set_fan_mode
+          target:
+            entity_id: climate.thermostat
+          data:
+            fan_mode: 'auto'
+        - service: notify.mobile_app_drews_iphone
+          data:
+            title: "🌬️ Central Fan Control"
+            message: "No active cooling systems - fan returned to AUTO"
+  
+  mode: restart  # Allow interruption for priority changes
+  icon: mdi:fan-auto
+
+- alias: Free Cooling Mode
+  sequence:
+    # Raise AC setpoint to save energy
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.thermostat
+      data:
+        temperature: 76
+        hvac_mode: 'cool'
+    
+    # Turn on available room fans to circulate cool outdoor air
+    - service: fan.turn_on
+      target:
+        entity_id: 
+          - fan.living_room_fan  # Available fan entity
+          - fan.office_fan       # Available fan entity (when working)
+      data:
+        percentage: 60  # Medium speed for air circulation
+    
+    # Use central fan control to coordinate thermostat fan
+    - service: script.central_fan_control
+    
+    # Keep this script running until manually stopped or sunrise
+    - wait_for_trigger:
+        - platform: event
+          event_type: script_free_cooling_mode_stop
+      timeout: "08:00:00"  # 8 hour maximum
+    
+    # Clean up when stopping
+    - service: fan.turn_off
+      target:
+        entity_id: 
+          - fan.living_room_fan
+          - fan.office_fan
+    
+    # Return fan control to central system
+    - service: script.central_fan_control
+  
+  mode: restart
+  icon: mdi:weather-night

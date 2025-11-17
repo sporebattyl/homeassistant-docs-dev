@@ -1,0 +1,1743 @@
+# =============================================================================
+# CLIMATE DASHBOARD ENHANCEMENTS - COMPREHENSIVE DASHBOARD SUPPORT
+# =============================================================================
+# Provides missing sensors and entities for the Climate Control Center dashboard
+# to ensure full functionality across all 5 tabs:
+# - Overview: Environmental intelligence and system status
+# - Sensors: Enhanced sensor monitoring and analytics
+# - Controls: Advanced occupancy intelligence
+# - Emergency: Comprehensive safety status
+# - Analytics: Complete energy and performance monitoring
+# =============================================================================
+
+homeassistant:
+  customize:
+    sensor.equipment_arbitration_effectiveness:
+      friendly_name: "Equipment Arbitration Effectiveness"
+      icon: mdi:cog-sync
+    sensor.coordination_energy_performance_score:
+      friendly_name: "Coordination Energy Performance Score"
+      icon: mdi:chart-line-variant
+    sensor.energy_aware_dehumidifier_priority:
+      friendly_name: "Energy Aware Dehumidifier Priority"
+      icon: mdi:water-percent-alert
+    sensor.energy_aware_hvac_efficiency:
+      friendly_name: "Energy Aware HVAC Efficiency"
+      icon: mdi:air-conditioner
+    binary_sensor.motion_follow_me_focus:
+      friendly_name: "Motion Follow-Me Focus"
+      icon: mdi:target-account
+      device_class: motion
+
+# Dashboard-specific sensors for Climate Control Center
+template:
+  - sensor:
+      # =======================================================================
+      # ENTITY NAME ALIASES - FIXES DASHBOARD "Entity not found" ERRORS
+      # =======================================================================
+
+      - name: "Average House Temperature Enhanced"
+        unique_id: average_house_temperature_enhanced_alias
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state: >
+          {% set source_value = states('sensor.average_house_temperature_combined') %}
+          {% if source_value in ['unknown', 'unavailable', 'none'] %}
+            {% set fallback_sensors = [
+              'sensor.climate_living_room_temperature',
+              'sensor.climate_laundry_room_temperature',
+              'sensor.climate_guest_bedroom_temperature'
+            ] %}
+            {% set valid_temps = [] %}
+            {% for sensor in fallback_sensors %}
+              {% if states(sensor) not in ['unknown', 'unavailable', 'none'] %}
+                {% set valid_temps = valid_temps + [states(sensor) | float] %}
+              {% endif %}
+            {% endfor %}
+            {% if valid_temps | length > 0 %}
+              {{ (valid_temps | sum / valid_temps | length) | round(1) }}
+            {% else %}
+              75.0
+            {% endif %}
+          {% else %}
+            {{ source_value | float(75) }}
+          {% endif %}
+        availability: >
+          {% set primary_available =
+            not is_state('sensor.average_house_temperature_combined', 'unavailable') %}
+          {% set fallback_available = not is_state('sensor.climate_living_room_temperature', 'unavailable') %}
+          {{ primary_available or fallback_available }}
+        attributes:
+          sensor_count: >-
+            {{ state_attr('sensor.average_house_temperature_combined', 'sensor_count')
+               | default(15) }}
+          integration_status: >-
+            {{ state_attr('sensor.average_house_temperature_combined', 'integration_status')
+               | default('Active') }}
+          temperature_range: >-
+            {{ state_attr('sensor.average_house_temperature_combined', 'temperature_range')
+               | default('70-78°F') }}
+          source_entity: "sensor.average_house_temperature_combined"
+
+      - name: "Average House Humidity Enhanced"
+        unique_id: average_house_humidity_enhanced_alias
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: >
+          {% set source_value = states('sensor.average_house_humidity_combined') %}
+          {% if source_value in ['unknown', 'unavailable', 'none'] %}
+            {% set fallback_sensors = [
+              'sensor.climate_living_room_humidity',
+              'sensor.climate_laundry_room_humidity',
+              'sensor.climate_outdoor_back_porch_humidity'
+            ] %}
+            {% set valid_humidity = [] %}
+            {% for sensor in fallback_sensors %}
+              {% if states(sensor) not in ['unknown', 'unavailable', 'none'] %}
+                {% set valid_humidity = valid_humidity + [states(sensor) | float] %}
+              {% endif %}
+            {% endfor %}
+            {% if valid_humidity | length > 0 %}
+              {{ (valid_humidity | sum / valid_humidity | length) | round(0) }}
+            {% else %}
+              50
+            {% endif %}
+          {% else %}
+            {{ source_value | float(50) | round(0) }}
+          {% endif %}
+        availability: >
+          {% set primary_available = not is_state('sensor.average_house_humidity_combined', 'unavailable') %}
+          {% set fallback_available = not is_state('sensor.climate_living_room_humidity', 'unavailable') %}
+          {{ primary_available or fallback_available }}
+        attributes:
+          sensor_count: >-
+            {{ state_attr('sensor.average_house_humidity_combined', 'sensor_count')
+               | default(15) }}
+          integration_status: >-
+            {{ state_attr('sensor.average_house_humidity_combined', 'integration_status')
+               | default('Active') }}
+          humidity_range: >-
+            {{ state_attr('sensor.average_house_humidity_combined', 'humidity_range')
+               | default('45-60%') }}
+          emergency_zone_count: >-
+            {{ state_attr('sensor.average_house_humidity_combined', 'emergency_zone_count')
+               | default(0) }}
+          source_entity: "sensor.average_house_humidity_combined"
+
+      # =======================================================================
+      # ML14XC1 AIR CONDITIONER SENSORS - COMPREHENSIVE IMPLEMENTATION
+      # =======================================================================
+
+      - name: "ML14XC1 Status"
+        unique_id: ml14xc1_status_dashboard
+        state: >
+          {% set hvac_action = state_attr('climate.thermostat', 'hvac_action') | default('idle') %}
+          {% if hvac_action == 'cooling' %}
+            Cooling Active
+          {% elif hvac_action == 'heating' %}
+            Heating Active
+          {% elif hvac_action == 'fan' %}
+            Fan Only
+          {% elif hvac_action == 'idle' %}
+            Standby
+          {% else %}
+            Offline
+          {% endif %}
+        icon: >
+          {% set hvac_action = state_attr('climate.thermostat', 'hvac_action') | default('idle') %}
+          {% if hvac_action == 'cooling' %}mdi:snowflake
+          {% elif hvac_action == 'heating' %}mdi:fire
+          {% else %}mdi:air-conditioner{% endif %}
+        attributes:
+          hvac_action: "{{ state_attr('climate.thermostat', 'hvac_action') | default('idle') }}"
+          current_temperature: "{{ state_attr('climate.thermostat', 'current_temperature') | default(0) }}°F"
+          target_temperature: "{{ state_attr('climate.thermostat', 'temperature') | default(0) }}°F"
+          equipment_type: "Lennox ML14XC1 (14 SEER)"
+
+      - name: "ML14XC1 Runtime Current"
+        unique_id: ml14xc1_runtime_current_dashboard
+        unit_of_measurement: "min"
+        state: >
+          {% if is_state('timer.hvac_runtime_monitor', 'active') %}
+            {% set duration = state_attr('timer.hvac_runtime_monitor', 'duration') %}
+            {% set remaining = state_attr('timer.hvac_runtime_monitor', 'remaining') %}
+            {% if duration and remaining %}
+              {% set duration_parts = duration.split(':') %}
+              {% set remaining_parts = remaining.split(':') %}
+              {% set duration_min = (duration_parts[0] | int * 60) + (duration_parts[1] | int) %}
+              {% set remaining_min = (remaining_parts[0] | int * 60) + (remaining_parts[1] | int) %}
+              {{ (duration_min - remaining_min) }}
+            {% else %}
+              0
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+        attributes:
+          daily_runtime_hours: "{{ states('sensor.ml14xc1_daily_runtime_hours') | float(0) | round(2, default=0) }}"
+          max_runtime: "{{ states('input_number.hvac_max_runtime_summer') | default(45) }} minutes"
+          runtime_efficiency: >
+            {% set runtime = states('sensor.ml14xc1_daily_runtime_hours') | float(0) %}
+            {% if runtime < 2 %}Low Usage
+            {% elif runtime < 5 %}Moderate Usage
+            {% elif runtime < 8 %}High Usage
+            {% else %}Very High Usage{% endif %}
+
+      - name: "ML14XC1 Protection Status"
+        unique_id: ml14xc1_protection_status_dashboard
+        state: >
+          {% set hvac_action = state_attr('climate.thermostat', 'hvac_action') | default('idle') %}
+          {% set runtime = states('sensor.ml14xc1_daily_runtime_hours') | float(0) * 60 %}
+          {% set max_runtime = states('input_number.hvac_max_runtime_summer') | float(45) %}
+          {% if runtime > max_runtime and hvac_action in ['cooling', 'heating'] %}
+            Runtime Protection Active
+          {% elif is_state('input_boolean.hvac_emergency_override', 'on') %}
+            Emergency Override Active
+          {% else %}
+            Normal Operation
+          {% endif %}
+        icon: >
+          {% set runtime = states('sensor.ml14xc1_daily_runtime_hours') | float(0) * 60 %}
+          {% set max_runtime = states('input_number.hvac_max_runtime_summer') | float(45) %}
+          {% if runtime > max_runtime %}mdi:shield-alert
+          {% else %}mdi:shield-check{% endif %}
+
+      - name: "ML14XC1 SEER Rating"
+        unique_id: ml14xc1_seer_rating_dashboard
+        state: "14"
+        unit_of_measurement: "SEER"
+        attributes:
+          equipment_model: "Lennox ML14XC1"
+          efficiency_class: "Standard Efficiency"
+          gulf_coast_optimized: true
+
+      - name: "ML14XC1 Daily Cost"
+        unique_id: ml14xc1_daily_cost_dashboard
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total
+        state: >
+          {% set runtime_hours = states('sensor.ml14xc1_daily_runtime_hours') | float(0) %}
+          {% set power_kw = 3.5 %}  {# ML14XC1 estimated draw #}
+          {% set electricity_rate_cents = states('input_number.electricity_rate') | float(18.0) %}
+          {% set cost_per_kwh = electricity_rate_cents / 100 %}
+          {% set energy_used = runtime_hours * power_kw %}
+          {{ (energy_used * cost_per_kwh) | round(2, default=0) }}
+        attributes:
+          runtime_hours: "{{ states('sensor.ml14xc1_daily_runtime_hours') | float(0) | round(2, default=0) }}"
+          energy_used_kwh: "{{ (states('sensor.ml14xc1_daily_runtime_hours') | float(0) * 3.5) | round(2, default=0) }}"
+          cost_per_kwh: "${{ (states('input_number.electricity_rate') | float(18.0) / 100) | round(3) }}"
+          electricity_rate: "{{ states('input_number.electricity_rate') }}¢/kWh"
+
+      - name: "ML14XC1 Efficiency Score"
+        unique_id: ml14xc1_efficiency_score_dashboard
+        unit_of_measurement: "%"
+        state: >
+          {% set current_temp = states('sensor.average_house_temperature_combined') | float(75) %}
+          {% set target_temp = state_attr('climate.thermostat', 'temperature') | float(74) %}
+          {% set temp_delta = (current_temp - target_temp) | abs %}
+          {% if temp_delta <= 0.5 %}
+            95
+          {% elif temp_delta <= 1.0 %}
+            90
+          {% elif temp_delta <= 2.0 %}
+            80
+          {% else %}
+            70
+          {% endif %}
+
+      - name: "ML14XC1 Next Maintenance"
+        unique_id: ml14xc1_next_maintenance_dashboard
+        state: >
+          {% set last_service = states('input_datetime.hvac_last_professional_service') %}
+          {% if last_service in ['unknown', 'unavailable', 'none'] %}
+            {% set last_service = '2024-03-01' %}
+          {% endif %}
+          {% set service_date = strptime(last_service, '%Y-%m-%d') %}
+          {% set next_service = service_date + timedelta(days=180) %}
+          {{ next_service.strftime('%B %d, %Y') }}
+        attributes:
+          days_until_service: >
+            {% set last_service = states('input_datetime.hvac_last_professional_service') %}
+            {% if last_service in ['unknown', 'unavailable', 'none'] %}
+              {% set last_service = '2024-03-01' %}
+            {% endif %}
+            {% set service_date = strptime(last_service, '%Y-%m-%d') %}
+            {% set next_service = service_date + timedelta(days=180) %}
+            {% set days_left = (next_service.date() - now().date()).days %}
+            {{ days_left if days_left > 0 else 0 }}
+          service_interval: "6 months"
+
+      - name: "ML14XC1 Filter Status"
+        unique_id: ml14xc1_filter_status_dashboard
+        state: >
+          {% set last_change = states('input_datetime.hvac_filter_last_changed') %}
+          {% if last_change in ['unknown', 'unavailable', 'none'] %}
+            {% set last_change = '2024-09-01' %}
+          {% endif %}
+          {% set change_date = strptime(last_change, '%Y-%m-%d').date() %}
+          {% set days_since = (now().date() - change_date).days %}
+          {% if days_since > 90 %}
+            Overdue
+          {% elif days_since > 75 %}
+            Due Soon
+          {% else %}
+            Good
+          {% endif %}
+        attributes:
+          days_since_change: >
+            {% set last_change = states('input_datetime.hvac_filter_last_changed') %}
+            {% if last_change in ['unknown', 'unavailable', 'none'] %}
+              {% set last_change = '2024-09-01' %}
+            {% endif %}
+            {% set change_date = strptime(last_change, '%Y-%m-%d').date() %}
+            {{ (now().date() - change_date).days }}
+          recommended_interval: "3 months"
+
+  - trigger:
+      - platform: state
+        entity_id: timer.hvac_runtime_monitor
+    sensor:
+      - name: "ML14XC1 Last Cycle Minutes"
+        unique_id: ml14xc1_last_cycle_minutes_dashboard
+        unit_of_measurement: "min"
+        icon: mdi:timer-outline
+        state_class: measurement
+        state: >-
+          {% set invalid = ['unknown', 'unavailable', '', None] %}
+          {% set previous = states('sensor.ml14xc1_last_cycle_minutes') %}
+          {% set previous = 0 if previous in invalid else previous | float %}
+          {% if trigger is not defined %}
+            {{ previous }}
+          {% else %}
+            {% set to_state = trigger.to_state.state if trigger.to_state else states('timer.hvac_runtime_monitor') %}
+            {% set from_state = trigger.from_state.state if trigger.from_state else None %}
+            {% if to_state == 'active' %}
+              0
+            {% elif to_state == 'idle' and from_state == 'active' and trigger.from_state %}
+              {% set duration = trigger.from_state.attributes.duration %}
+              {% set remaining = trigger.from_state.attributes.remaining %}
+              {% if duration %}
+                {% set duration_parts = duration.split(':') %}
+                {% if duration_parts | length == 3 %}
+                  {% set duration_sec =
+                    (duration_parts[0] | int * 3600) + (duration_parts[1] | int * 60) +
+                    (duration_parts[2] | int) %}
+                {% elif duration_parts | length == 2 %}
+                  {% set duration_sec = (duration_parts[0] | int * 60) + (duration_parts[1] | int) %}
+                {% else %}
+                  {% set duration_sec = duration_parts[0] | int %}
+                {% endif %}
+                {% set remaining_parts = (remaining.split(':')) if remaining else ['0', '0', '0'] %}
+                {% if remaining_parts | length == 3 %}
+                  {% set remaining_sec =
+                    (remaining_parts[0] | int * 3600) + (remaining_parts[1] | int * 60) +
+                    (remaining_parts[2] | int) %}
+                {% elif remaining_parts | length == 2 %}
+                  {% set remaining_sec = (remaining_parts[0] | int * 60) + (remaining_parts[1] | int) %}
+                {% else %}
+                  {% set remaining_sec = remaining_parts[0] | int %}
+                {% endif %}
+                {% set elapsed_sec = duration_sec - remaining_sec %}
+                {% if elapsed_sec < 0 %}{% set elapsed_sec = 0 %}{% endif %}
+                {{ (elapsed_sec / 60) | round(1) }}
+              {% else %}
+                {{ previous }}
+              {% endif %}
+            {% else %}
+              {{ previous }}
+            {% endif %}
+          {% endif %}
+        attributes:
+          cycle_completed: >-
+            {% if trigger is defined and trigger.to_state and trigger.to_state.state == 'idle' and
+                  trigger.from_state and trigger.from_state.state == 'active' %}
+              {{ now().isoformat() }}
+            {% else %}
+              {{ state_attr('sensor.ml14xc1_last_cycle_minutes', 'cycle_completed') }}
+            {% endif %}
+          timer_remaining: >-
+            {% if trigger is defined and trigger.from_state %}
+              {{ trigger.from_state.attributes.remaining }}
+            {% else %}
+              {{ state_attr('timer.hvac_runtime_monitor', 'remaining') }}
+            {% endif %}
+          source: >-
+            {% if trigger is defined and trigger.to_state and trigger.to_state.state == 'idle' and
+                  trigger.from_state and trigger.from_state.state == 'active' %}
+              timer_stopped
+            {% elif trigger is defined and trigger.to_state and trigger.to_state.state == 'active' %}
+              timer_started
+            {% else %}
+              cached
+            {% endif %}
+
+
+      # =======================================================================
+      # E130 DEHUMIDIFIER SENSORS - COMPREHENSIVE IMPLEMENTATION
+      # =======================================================================
+
+      - name: "E130 Status"
+        unique_id: e130_status_dashboard
+        state: >
+          {% if is_state('switch.dehumidifier_relay_l1', 'on') %}
+            Active - Dehumidifying
+          {% elif is_state('switch.dehumidifier_relay_l1', 'off') %}
+            Standby
+          {% else %}
+            Offline
+          {% endif %}
+        icon: >
+          {% if is_state('switch.dehumidifier_relay_l1', 'on') %}
+            mdi:air-humidifier
+          {% else %}
+            mdi:air-humidifier-variant
+          {% endif %}
+        attributes:
+          switch_state: "{{ states('switch.dehumidifier_relay_l1') }}"
+          current_humidity: "{{ states('sensor.average_house_humidity_combined') }}%"
+          target_humidity: "{{ states('input_number.humidity_target') }}%"
+          equipment_type: "Aprilaire E130"
+
+      - name: "E130 Last Runtime"
+        unique_id: e130_last_runtime_dashboard
+        unit_of_measurement: "min"
+        state: >
+          {% if is_state('timer.dehumidifier_runtime_monitor', 'active') %}
+            {% set duration = state_attr('timer.dehumidifier_runtime_monitor', 'duration') %}
+            {% set remaining = state_attr('timer.dehumidifier_runtime_monitor', 'remaining') %}
+            {% if duration and remaining %}
+              {% set duration_parts = duration.split(':') %}
+              {% set remaining_parts = remaining.split(':') %}
+              {% set duration_min = (duration_parts[0] | int * 60) + (duration_parts[1] | int) %}
+              {% set remaining_min = (remaining_parts[0] | int * 60) + (remaining_parts[1] | int) %}
+              {{ (duration_min - remaining_min) }}
+            {% else %}
+              0
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+        attributes:
+          max_runtime: "{{ states('input_number.dehumidifier_max_runtime') | default(45) }} minutes"
+          cooldown_period: "{{ states('input_number.dehumidifier_cooldown') | default(10) }} minutes"
+          runtime_efficiency: >
+            {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+            {% if humidity < 50 %}Excellent
+            {% elif humidity < 55 %}Good
+            {% else %}Working Hard{% endif %}
+
+  - trigger:
+      - platform: state
+        entity_id: timer.dehumidifier_runtime_monitor
+    sensor:
+      - name: "E130 Last Cycle Minutes"
+        unique_id: e130_last_cycle_minutes_dashboard
+        unit_of_measurement: "min"
+        icon: mdi:timer-sand
+        state_class: measurement
+        state: >-
+          {% set invalid = ['unknown', 'unavailable', '', None] %}
+          {% set previous = states('sensor.e130_last_cycle_minutes') %}
+          {% set previous = 0 if previous in invalid else previous | float %}
+          {% if trigger is not defined %}
+            {{ previous }}
+          {% else %}
+            {% set to_state =
+              trigger.to_state.state if trigger.to_state
+              else states('timer.dehumidifier_runtime_monitor') %}
+            {% set from_state = trigger.from_state.state if trigger.from_state else None %}
+            {% if to_state == 'active' %}
+              0
+            {% elif to_state == 'idle' and from_state == 'active' and trigger.from_state %}
+              {% set duration = trigger.from_state.attributes.duration %}
+              {% set remaining = trigger.from_state.attributes.remaining %}
+              {% if duration %}
+                {% set duration_parts = duration.split(':') %}
+                {% if duration_parts | length == 3 %}
+                  {% set duration_sec =
+                    (duration_parts[0] | int * 3600) + (duration_parts[1] | int * 60) +
+                    (duration_parts[2] | int) %}
+                {% elif duration_parts | length == 2 %}
+                  {% set duration_sec = (duration_parts[0] | int * 60) + (duration_parts[1] | int) %}
+                {% else %}
+                  {% set duration_sec = duration_parts[0] | int %}
+                {% endif %}
+                {% set remaining_parts = (remaining.split(':')) if remaining else ['0', '0', '0'] %}
+                {% if remaining_parts | length == 3 %}
+                  {% set remaining_sec =
+                    (remaining_parts[0] | int * 3600) + (remaining_parts[1] | int * 60) +
+                    (remaining_parts[2] | int) %}
+                {% elif remaining_parts | length == 2 %}
+                  {% set remaining_sec = (remaining_parts[0] | int * 60) + (remaining_parts[1] | int) %}
+                {% else %}
+                  {% set remaining_sec = remaining_parts[0] | int %}
+                {% endif %}
+                {% set elapsed_sec = duration_sec - remaining_sec %}
+                {% if elapsed_sec < 0 %}{% set elapsed_sec = 0 %}{% endif %}
+                {{ (elapsed_sec / 60) | round(1) }}
+              {% else %}
+                {{ previous }}
+              {% endif %}
+            {% else %}
+              {{ previous }}
+            {% endif %}
+          {% endif %}
+        attributes:
+          cycle_completed: >-
+            {% if trigger is defined and trigger.to_state and trigger.to_state.state == 'idle' and
+                  trigger.from_state and trigger.from_state.state == 'active' %}
+              {{ now().isoformat() }}
+            {% else %}
+              {{ state_attr('sensor.e130_last_cycle_minutes', 'cycle_completed') }}
+            {% endif %}
+          timer_remaining: >-
+            {% if trigger is defined and trigger.from_state %}
+              {{ trigger.from_state.attributes.remaining }}
+            {% else %}
+              {{ state_attr('timer.dehumidifier_runtime_monitor', 'remaining') }}
+            {% endif %}
+          source: >-
+            {% if trigger is defined and trigger.to_state and trigger.to_state.state == 'idle' and
+                  trigger.from_state and trigger.from_state.state == 'active' %}
+              timer_stopped
+            {% elif trigger is defined and trigger.to_state and trigger.to_state.state == 'active' %}
+              timer_started
+            {% else %}
+              cached
+            {% endif %}
+
+      - name: "E130 Protection Status"
+        unique_id: e130_protection_status_dashboard
+        state: >
+          {% set outdoor_temp = states('weather.home') | default('unknown') %}
+          {% set temp_attr = state_attr('weather.home', 'temperature') %}
+          {% if temp_attr == None %}
+            {% set temp_attr = 70 %}
+          {% endif %}
+          {% if temp_attr | float(70) < 32 %}
+            Freeze Protection Active
+          {% elif is_state('input_boolean.hvac_emergency_override', 'on') %}
+            Emergency Override Active
+          {% else %}
+            Normal Operation
+          {% endif %}
+        icon: >
+          {% set temp_attr = state_attr('weather.home', 'temperature') %}
+          {% if temp_attr == None %}
+            {% set temp_attr = 70 %}
+          {% endif %}
+          {% if temp_attr | float(70) < 32 %}mdi:snowflake-alert
+          {% else %}mdi:shield-check{% endif %}
+
+      - name: "E130 Filter Life"
+        unique_id: e130_filter_life_dashboard
+        unit_of_measurement: "%"
+        state: >
+          {% set last_change = states('input_datetime.dehumidifier_filter_last_changed') %}
+          {% if last_change in ['unknown', 'unavailable', 'none'] %}
+            {% set last_change = '2024-09-01' %}
+          {% endif %}
+          {% set change_date = strptime(last_change, '%Y-%m-%d').date() %}
+          {% set days_since = (now().date() - change_date).days %}
+          {% set life_remaining = 100 - ((days_since / 180) * 100) %}
+          {{ life_remaining | round(0, default=0) if life_remaining > 0 else 0 }}
+        attributes:
+          days_since_change: >
+            {% set last_change = states('input_datetime.dehumidifier_filter_last_changed') %}
+            {% if last_change in ['unknown', 'unavailable', 'none'] %}
+              {% set last_change = '2024-09-01' %}
+            {% endif %}
+            {% set change_date = strptime(last_change, '%Y-%m-%d').date() %}
+            {{ (now().date() - change_date).days }}
+          recommended_interval: "6 months"
+
+      - name: "E130 Daily Cost"
+        unique_id: e130_daily_cost_dashboard
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total
+        state: >
+          {% set runtime_hours = states('sensor.e130_daily_runtime_hours') | float(0) %}
+          {% set power_kw = 0.8 %}  {# AprilAire E130 nominal draw #}
+          {% set electricity_rate_cents = states('input_number.electricity_rate') | float(18.0) %}
+          {% set cost_per_kwh = electricity_rate_cents / 100 %}
+          {% set energy_used = runtime_hours * power_kw %}
+          {{ (energy_used * cost_per_kwh) | round(2, default=0) }}
+        attributes:
+          runtime_hours: "{{ states('sensor.e130_daily_runtime_hours') | float(0) | round(2, default=0) }}"
+          energy_used_kwh: "{{ (states('sensor.e130_daily_runtime_hours') | float(0) * 0.8) | round(2, default=0) }}"
+          cost_per_kwh: "${{ (states('input_number.electricity_rate') | float(18.0) / 100) | round(3) }}"
+          electricity_rate: "{{ states('input_number.electricity_rate') }}¢/kWh"
+
+      - name: "E130 Efficiency Score"
+        unique_id: e130_efficiency_score_dashboard
+        unit_of_measurement: "%"
+        state: >
+          {% set current_humidity = states('sensor.average_house_humidity_combined') | float(55) %}
+          {% set target_humidity = states('input_number.humidity_target') | float(50) %}
+          {% if current_humidity <= target_humidity %}
+            100
+          {% elif current_humidity <= target_humidity + 3 %}
+            90
+          {% elif current_humidity <= target_humidity + 5 %}
+            80
+          {% else %}
+            70
+          {% endif %}
+
+      - name: "E130 Next Maintenance"
+        unique_id: e130_next_maintenance_dashboard
+        state: >
+          {% set last_service = states('input_datetime.dehumidifier_last_service') %}
+          {% if last_service in ['unknown', 'unavailable', 'none'] %}
+            {% set last_service = '2023-12-01' %}
+          {% endif %}
+          {% set service_date = strptime(last_service, '%Y-%m-%d') %}
+          {% set next_service = service_date + timedelta(days=365) %}
+          {{ next_service.strftime('%B %d, %Y') }}
+        attributes:
+          days_until_service: >
+            {% set last_service = states('input_datetime.dehumidifier_last_service') %}
+            {% if last_service in ['unknown', 'unavailable', 'none'] %}
+              {% set last_service = '2023-12-01' %}
+            {% endif %}
+            {% set service_date = strptime(last_service, '%Y-%m-%d') %}
+            {% set next_service = service_date + timedelta(days=365) %}
+            {% set days_left = (next_service.date() - now().date()).days %}
+            {{ days_left if days_left > 0 else 0 }}
+          service_interval: "12 months"
+
+      # =======================================================================
+      # MOTION FOLLOW-ME SYSTEM STATUS - USER'S FAVORITE FEATURE
+      # =======================================================================
+
+      - name: "Motion Follow-Me System Status"
+        unique_id: motion_follow_me_system_status
+        state: >
+          {% set presence_sensors = [
+            'binary_sensor.presence_living_room_presence',
+            'binary_sensor.presence_dining_room_presence',
+            'binary_sensor.presence_kitchen_presence',
+            'binary_sensor.presence_half_bathroom_presence',
+            'binary_sensor.presence_rowans_room_presence',
+            'binary_sensor.presence_guest_bathroom_presence',
+            'binary_sensor.presence_guest_bedroom_presence',
+            'binary_sensor.presence_guest_hallway_presence',
+            'binary_sensor.presence_foyer_garage_presence',
+            'binary_sensor.presence_master_bedroom_presence',
+            'binary_sensor.presence_master_bathroom_presence',
+            'binary_sensor.presence_master_closet_presence',
+            'binary_sensor.presence_master_hallway_presence',
+            'binary_sensor.presence_office_presence',
+            'binary_sensor.presence_foyer_front_door_presence'
+          ] %}
+          {% set active_zones = presence_sensors | select('is_state', 'on') | list %}
+          {% if not is_state('input_boolean.motion_follow_me_enabled', 'on') %}
+            Disabled
+          {% elif is_state('timer.foundation_motion_manual_override_pause', 'active') %}
+            Manual Override Active
+          {% elif active_zones | length > 0 %}
+            Active - {{ active_zones | length }} Zone{{ 's' if active_zones | length > 1 else '' }}
+          {% else %}
+            Standby - No Motion
+          {% endif %}
+        icon: >
+          {% set active_zones = [
+            'binary_sensor.presence_living_room_presence',
+            'binary_sensor.presence_dining_room_presence',
+            'binary_sensor.presence_kitchen_presence',
+            'binary_sensor.presence_half_bathroom_presence',
+            'binary_sensor.presence_rowans_room_presence',
+            'binary_sensor.presence_guest_bathroom_presence',
+            'binary_sensor.presence_guest_bedroom_presence',
+            'binary_sensor.presence_guest_hallway_presence',
+            'binary_sensor.presence_foyer_garage_presence',
+            'binary_sensor.presence_master_bedroom_presence',
+            'binary_sensor.presence_master_bathroom_presence',
+            'binary_sensor.presence_master_closet_presence',
+            'binary_sensor.presence_master_hallway_presence',
+            'binary_sensor.presence_office_presence',
+            'binary_sensor.presence_foyer_front_door_presence'
+          ] | select('is_state', 'on') | list %}
+          {% if active_zones | length > 0 %}mdi:run
+          {% else %}mdi:walk{% endif %}
+        attributes:
+          enabled: "{{ is_state('input_boolean.motion_follow_me_enabled', 'on') }}"
+          precision_cooling: "{{ is_state('input_boolean.motion_enhanced_precision_cooling_enabled', 'on') }}"
+          active_zones: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set ns = namespace(active=[]) %}
+            {% for sensor in presence_sensors %}
+              {% if is_state(sensor, 'on') %}
+                {% set room =
+                  sensor.replace('binary_sensor.presence_', '').replace('_presence', '')
+                         .replace('_', ' ').title() %}
+                {% set ns.active = ns.active + [room] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.active | join(', ') if ns.active | length > 0 else 'No motion detected' }}
+          sensor_count: "15 sensors monitored"
+          sensors_online: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set online =
+              presence_sensors | reject('is_state', 'unavailable')
+                               | reject('is_state', 'unknown') | list | length %}
+            {{ online }}/15
+          system_status: "System Enabled - User's Favorite Feature"
+
+      - name: "Motion Follow-Me Focus Status"
+        unique_id: motion_follow_me_focus_status
+        state: >
+          {% set presence_sensors = [
+            'binary_sensor.presence_living_room_presence',
+            'binary_sensor.presence_dining_room_presence',
+            'binary_sensor.presence_kitchen_presence',
+            'binary_sensor.presence_half_bathroom_presence',
+            'binary_sensor.presence_rowans_room_presence',
+            'binary_sensor.presence_guest_bathroom_presence',
+            'binary_sensor.presence_guest_bedroom_presence',
+            'binary_sensor.presence_guest_hallway_presence',
+            'binary_sensor.presence_foyer_garage_presence',
+            'binary_sensor.presence_master_bedroom_presence',
+            'binary_sensor.presence_master_bathroom_presence',
+            'binary_sensor.presence_master_closet_presence',
+            'binary_sensor.presence_master_hallway_presence',
+            'binary_sensor.presence_office_presence',
+            'binary_sensor.presence_foyer_front_door_presence'
+          ] %}
+          {{ presence_sensors | select('is_state', 'on') | list | length > 0 }}
+        icon: mdi:target-account
+        attributes:
+          active_zones: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set ns = namespace(active=[]) %}
+            {% for sensor in presence_sensors %}
+              {% if is_state(sensor, 'on') %}
+                {% set room =
+                  sensor.replace('binary_sensor.presence_', '').replace('_presence', '')
+                         .replace('_', ' ').title() %}
+                {% set ns.active = ns.active + [room] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.active | join(', ') if ns.active | length > 0 else 'No motion detected' }}
+          sensors_online: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set online =
+              presence_sensors | reject('is_state', 'unavailable')
+                               | reject('is_state', 'unknown') | list | length %}
+            {{ online }}/15
+          last_updated: "{{ now().strftime('%I:%M %p') }}"
+
+  - binary_sensor:
+      - name: "Motion Follow-Me Focus"
+        unique_id: motion_follow_me_focus
+        device_class: motion
+        state: >
+          {% set presence_sensors = [
+            'binary_sensor.presence_living_room_presence',
+            'binary_sensor.presence_dining_room_presence',
+            'binary_sensor.presence_kitchen_presence',
+            'binary_sensor.presence_half_bathroom_presence',
+            'binary_sensor.presence_rowans_room_presence',
+            'binary_sensor.presence_guest_bathroom_presence',
+            'binary_sensor.presence_guest_bedroom_presence',
+            'binary_sensor.presence_guest_hallway_presence',
+            'binary_sensor.presence_foyer_garage_presence',
+            'binary_sensor.presence_master_bedroom_presence',
+            'binary_sensor.presence_master_bathroom_presence',
+            'binary_sensor.presence_master_closet_presence',
+            'binary_sensor.presence_master_hallway_presence',
+            'binary_sensor.presence_office_presence',
+            'binary_sensor.presence_foyer_front_door_presence'
+          ] %}
+          {{ presence_sensors | select('is_state', 'on') | list | length > 0 and
+             is_state('input_boolean.motion_follow_me_enabled', 'on') }}
+        icon: >
+          {% set active_zones = [
+            'binary_sensor.presence_living_room_presence',
+            'binary_sensor.presence_dining_room_presence',
+            'binary_sensor.presence_kitchen_presence',
+            'binary_sensor.presence_half_bathroom_presence',
+            'binary_sensor.presence_rowans_room_presence',
+            'binary_sensor.presence_guest_bathroom_presence',
+            'binary_sensor.presence_guest_bedroom_presence',
+            'binary_sensor.presence_guest_hallway_presence',
+            'binary_sensor.presence_foyer_garage_presence',
+            'binary_sensor.presence_master_bedroom_presence',
+            'binary_sensor.presence_master_bathroom_presence',
+            'binary_sensor.presence_master_closet_presence',
+            'binary_sensor.presence_master_hallway_presence',
+            'binary_sensor.presence_office_presence',
+            'binary_sensor.presence_foyer_front_door_presence'
+          ] | select('is_state', 'on') | list %}
+          {% if active_zones | length > 0 %}mdi:run
+          {% else %}mdi:walk{% endif %}
+        attributes:
+          status_text: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set active_zones = presence_sensors | select('is_state', 'on') | list %}
+            {% if active_zones | length > 0 %}Active Motion
+            {% else %}No Motion{% endif %}
+          enabled: "{{ is_state('input_boolean.motion_follow_me_enabled', 'on') and 'on' or 'off' }}"
+          precision_cooling: >-
+            {{ is_state('input_boolean.motion_enhanced_precision_cooling_enabled', 'on') and
+               'on' or 'off' }}
+          active_zones: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set ns = namespace(active=[]) %}
+            {% for sensor in presence_sensors %}
+              {% if is_state(sensor, 'on') %}
+                {% set room =
+                  sensor.replace('binary_sensor.presence_', '').replace('_presence', '')
+                         .replace('_', ' ').title() %}
+                {% set ns.active = ns.active + [room] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.active | join(', ') if ns.active | length > 0 else 'No motion detected' }}
+          sensor_count: "15 sensors monitored"
+          sensors_online: >
+            {% set presence_sensors = [
+              'binary_sensor.presence_living_room_presence',
+              'binary_sensor.presence_dining_room_presence',
+              'binary_sensor.presence_kitchen_presence',
+              'binary_sensor.presence_half_bathroom_presence',
+              'binary_sensor.presence_rowans_room_presence',
+              'binary_sensor.presence_guest_bathroom_presence',
+              'binary_sensor.presence_guest_bedroom_presence',
+              'binary_sensor.presence_guest_hallway_presence',
+              'binary_sensor.presence_foyer_garage_presence',
+              'binary_sensor.presence_master_bedroom_presence',
+              'binary_sensor.presence_master_bathroom_presence',
+              'binary_sensor.presence_master_closet_presence',
+              'binary_sensor.presence_master_hallway_presence',
+              'binary_sensor.presence_office_presence',
+              'binary_sensor.presence_foyer_front_door_presence'
+            ] %}
+            {% set online =
+              presence_sensors | reject('is_state', 'unavailable')
+                               | reject('is_state', 'unknown') | list | length %}
+            {{ online }}/15
+          system_status: "System Enabled - User's Favorite Feature"
+
+  - sensor:
+      # =======================================================================
+      # ENVIRONMENTAL & SAFETY SENSORS - GULF COAST INTELLIGENCE
+      # =======================================================================
+
+      - name: "Environmental Intelligence Dashboard"
+        unique_id: environmental_intelligence_status_dashboard
+        state: >
+          {% set temp = states('sensor.average_house_temperature_combined') | float(75) %}
+          {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+          {% set outdoor_temp = state_attr('weather.home', 'temperature') | default(80) %}
+          {% if humidity > 60 %}
+            Emergency: High Humidity ({{ humidity }}%)
+          {% elif temp > 78 and outdoor_temp > 90 %}
+            High Heat Stress Conditions
+          {% elif humidity > 55 %}
+            Elevated Humidity Warning
+          {% else %}
+            Normal Gulf Coast Conditions
+          {% endif %}
+        icon: >
+          {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+          {% if humidity > 60 %}mdi:alert-circle
+          {% elif humidity > 55 %}mdi:weather-cloudy-alert
+          {% else %}mdi:weather-partly-cloudy{% endif %}
+        attributes:
+          indoor_temperature: "{{ states('sensor.average_house_temperature_combined') }}°F"
+          indoor_humidity: "{{ states('sensor.average_house_humidity_combined') }}%"
+          outdoor_temperature: "{{ state_attr('weather.home', 'temperature') | default(80) }}°F"
+          heat_stress_risk: >
+            {% set temp = states('sensor.average_house_temperature_combined') | float(75) %}
+            {% set outdoor_temp = state_attr('weather.home', 'temperature') | default(80) | float(80) %}
+            {% if temp > 78 and outdoor_temp > 95 %}High
+            {% elif temp > 76 and outdoor_temp > 90 %}Medium
+            {% else %}Low{% endif %}
+          humidity_ceiling: "60% (Gulf Coast Max)"
+
+      - name: "Gulf Coast Heat Index Enhanced"
+        unique_id: gulf_coast_heat_index_enhanced_dashboard
+        unit_of_measurement: "°F"
+        state: >
+          {% set temp_f = states('sensor.average_house_temperature_combined') | float(75) %}
+          {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+          {% if temp_f < 80 or humidity < 40 %}
+            {{ temp_f | round(0, default=75) }}
+          {% else %}
+            {% set c1 = -42.379 %}
+            {% set c2 = 2.04901523 %}
+            {% set c3 = 10.14333127 %}
+            {% set c4 = -0.22475541 %}
+            {% set c5 = -0.00683783 %}
+            {% set c6 = -0.05481717 %}
+            {% set c7 = 0.00122874 %}
+            {% set c8 = 0.00085282 %}
+            {% set c9 = -0.00000199 %}
+            {% set hi = c1 + (c2 * temp_f) + (c3 * humidity) + (c4 * temp_f * humidity) +
+                        (c5 * temp_f * temp_f) + (c6 * humidity * humidity) +
+                        (c7 * temp_f * temp_f * humidity) + (c8 * temp_f * humidity * humidity) +
+                        (c9 * temp_f * temp_f * humidity * humidity) %}
+            {{ hi | round(0, default=80) }}
+          {% endif %}
+        attributes:
+          indoor_temp: "{{ states('sensor.average_house_temperature_combined') }}°F"
+          indoor_humidity: "{{ states('sensor.average_house_humidity_combined') }}%"
+          risk_level: >
+            {% set temp_f = states('sensor.average_house_temperature_combined') | float(75) %}
+            {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+            {% if temp_f < 80 %}Low Risk
+            {% elif humidity > 60 %}High Risk - Emergency Dehumidification
+            {% elif temp_f > 85 and humidity > 50 %}Caution - Monitor Closely
+            {% else %}Normal{% endif %}
+
+      - name: "Equipment Status Enhanced"
+        unique_id: equipment_status_enhanced_dashboard
+        state: >
+          {% set hvac_status = state_attr('climate.thermostat', 'hvac_action') | default('idle') %}
+          {% set dehumid_status = states('switch.dehumidifier_relay_l1') %}
+          {% if hvac_status == 'cooling' and dehumid_status == 'on' %}
+            Coordination Active (Both Running)
+          {% elif hvac_status == 'cooling' %}
+            AC Cooling Active
+          {% elif dehumid_status == 'on' %}
+            Dehumidifier Active
+          {% elif hvac_status == 'heating' %}
+            Heating Active
+          {% else %}
+            All Equipment Standby
+          {% endif %}
+        icon: >
+          {% set hvac_status = state_attr('climate.thermostat', 'hvac_action') | default('idle') %}
+          {% set dehumid_status = states('switch.dehumidifier_relay_l1') %}
+          {% if hvac_status == 'cooling' and dehumid_status == 'on' %}mdi:cog-sync
+          {% elif hvac_status == 'cooling' %}mdi:snowflake
+          {% elif dehumid_status == 'on' %}mdi:air-humidifier
+          {% elif hvac_status == 'heating' %}mdi:fire
+          {% else %}mdi:power-standby{% endif %}
+        attributes:
+          hvac_action: "{{ state_attr('climate.thermostat', 'hvac_action') | default('idle') }}"
+          dehumidifier_state: "{{ states('switch.dehumidifier_relay_l1') }}"
+          coordination_status: >
+            {% set hvac_status = state_attr('climate.thermostat', 'hvac_action') | default('idle') %}
+            {% set dehumid_status = states('switch.dehumidifier_relay_l1') %}
+            {% if hvac_status == 'cooling' and dehumid_status == 'on' %}
+              Potential Conflict - Monitor Equipment
+            {% else %}
+              Normal Operation - No Conflicts
+            {% endif %}
+
+      - name: "Energy Cost Daily Projection"
+        unique_id: energy_cost_daily_projection_dashboard
+        unit_of_measurement: "$"
+        device_class: monetary
+        state_class: total
+        state: >
+          {% set hvac_runtime = states('sensor.ml14xc1_daily_runtime_hours') | float(0) %}
+          {% set dehumid_runtime = states('sensor.e130_daily_runtime_hours') | float(0) %}
+          {% set hvac_power = 3.5 %}
+          {% set dehumid_power = 0.8 %}
+          {% set electricity_rate_cents = states('input_number.electricity_rate') | float(18.0) %}
+          {% set cost_per_kwh = electricity_rate_cents / 100 %}
+          {% set hvac_cost = hvac_runtime * hvac_power * cost_per_kwh %}
+          {% set dehumid_cost = dehumid_runtime * dehumid_power * cost_per_kwh %}
+          {{ (hvac_cost + dehumid_cost) | round(2, default=0) }}
+        attributes:
+          hvac_cost: >
+            {% set runtime = states('sensor.ml14xc1_daily_runtime_hours') | float(0) %}
+            {% set electricity_rate_cents = states('input_number.electricity_rate') | float(18.0) %}
+            {% set cost_per_kwh = electricity_rate_cents / 100 %}
+            {{ (runtime * 3.5 * cost_per_kwh) | round(2, default=0) }}
+          dehumidifier_cost: >
+            {% set runtime = states('sensor.e130_daily_runtime_hours') | float(0) %}
+            {% set electricity_rate_cents = states('input_number.electricity_rate') | float(18.0) %}
+            {% set cost_per_kwh = electricity_rate_cents / 100 %}
+            {{ (runtime * 0.8 * cost_per_kwh) | round(2, default=0) }}
+          total_kwh: >
+            {% set hvac_runtime = states('sensor.ml14xc1_daily_runtime_hours') | float(0) %}
+            {% set dehumid_runtime = states('sensor.e130_daily_runtime_hours') | float(0) %}
+            {{ ((hvac_runtime * 3.5) + (dehumid_runtime * 0.8)) | round(2, default=0) }}
+          cost_per_kwh: "${{ (states('input_number.electricity_rate') | float(18.0) / 100) | round(3) }}"
+          electricity_rate: "{{ states('input_number.electricity_rate') }}¢/kWh"
+
+      - name: "Energy Savings Annual Progress"
+        unique_id: energy_savings_annual_progress_dashboard
+        unit_of_measurement: "$"
+        device_class: monetary
+        state: >
+          {% set daily_cost = states('sensor.energy_cost_daily_projection') | float(5.0) %}
+          {% set baseline_daily = 6.5 %}  {# Before optimization baseline #}
+          {% set daily_savings = baseline_daily - daily_cost %}
+          {% set annual_savings = daily_savings * 365 %}
+          {{ annual_savings | round(0, default=0) }}
+        attributes:
+          daily_savings: >
+            {% set daily_cost = states('sensor.energy_cost_daily_projection') | float(5.0) %}
+            {% set baseline_daily = 6.5 %}
+            {{ (baseline_daily - daily_cost) | round(2, default=0) }}
+          target_annual_savings: "$548"
+          progress_percent: >
+            {% set daily_cost = states('sensor.energy_cost_daily_projection') | float(5.0) %}
+            {% set baseline_daily = 6.5 %}
+            {% set daily_savings = baseline_daily - daily_cost %}
+            {% set annual_savings = daily_savings * 365 %}
+            {{ ((annual_savings / 548) * 100) | round(0, default=0) }}%
+          current_efficiency: >
+            {% set daily_cost = states('sensor.energy_cost_daily_projection') | float(5.0) %}
+            {% set baseline_daily = 6.5 %}
+            {% if daily_cost < baseline_daily %}Exceeding Target
+            {% else %}Below Target{% endif %}
+
+      - name: "System Health Gauge"
+        # Entity: sensor.system_health_gauge
+        unique_id: system_health_gauge_numeric
+        unit_of_measurement: "%"
+        device_class: battery
+        state: >
+          {% set health_state = states('sensor.foundation_system_health') %}
+          {% set uptime = states('sensor.system_uptime_percentage') | float(100) %}
+          {% set climate_score = states('sensor.climate_system_health_score') | float(100) %}
+          {% if health_state == 'excellent' and uptime >= 99.5 %}100
+          {% elif health_state == 'excellent' %}95
+          {% elif health_state == 'good' and uptime >= 99.0 %}90
+          {% elif health_state == 'good' %}85
+          {% elif health_state == 'warning' %}60
+          {% elif health_state == 'poor' %}45
+          {% elif health_state == 'critical' %}30
+          {% elif health_state == 'offline' %}0
+          {% else %}{{ climate_score | round(0) if climate_score > 0 else 75 }}
+          {% endif %}
+        attributes:
+          text_status: "{{ states('sensor.foundation_system_health') }}"
+          climate_health_score: "{{ states('sensor.climate_system_health_score') }}%"
+          system_uptime: "{{ states('sensor.system_uptime_percentage') }}%"
+          uptime_target_met: "{{ states('binary_sensor.uptime_target_met') }}"
+          available_sensors: "{{ state_attr('sensor.foundation_system_health', 'available_sensors') | default(15) }}"
+          foundation_status: >-
+            {{ state_attr('sensor.foundation_system_health', 'foundation_status')
+               | default('Operational') }}
+          last_updated: "{{ now().strftime('%I:%M %p') }}"
+          calculation: "Combined foundation health, climate score, and uptime metrics"
+
+      # =======================================================================
+      # ANALYTICS TAB SENSORS - ENERGY & PERFORMANCE MONITORING
+      # =======================================================================
+
+      - name: "Equipment Arbitration Effectiveness"
+        unique_id: equipment_arbitration_effectiveness
+        unit_of_measurement: "%"
+        state: >
+          {% set hvac_state = state_attr('climate.thermostat', 'hvac_action') | default('unknown') %}
+          {% set dehumid_state = states('switch.dehumidifier_relay_l1') %}
+          {% if hvac_state == 'cooling' and dehumid_state == 'on' %}
+            85
+          {% elif hvac_state == 'cooling' or dehumid_state == 'on' %}
+            95
+          {% else %}
+            100
+          {% endif %}
+        attributes:
+          status: >
+            {% set hvac_state = state_attr('climate.thermostat', 'hvac_action') | default('unknown') %}
+            {% set dehumid_state = states('switch.dehumidifier_relay_l1') %}
+            {% if hvac_state == 'cooling' and dehumid_state == 'on' %}
+              ML14XC1/E130 Coordination Active - Monitor Energy Usage
+            {% else %}
+              ML14XC1/E130 Coordination Optimal - No Equipment Conflicts
+            {% endif %}
+          hvac_action: "{{ state_attr('climate.thermostat', 'hvac_action') | default('unknown') }}"
+          dehumidifier_state: "{{ states('switch.dehumidifier_relay_l1') }}"
+          equipment_context: "Lennox ML14XC1 Air Conditioner + Aprilaire E130 Dehumidifier"
+          gulf_coast_optimization: "Prevents overcooling while maintaining 60% humidity ceiling"
+
+      - name: "Coordination Energy Performance Score"
+        unique_id: coordination_energy_performance_score
+        unit_of_measurement: "%"
+        state: >
+          {% set efficiency = states('sensor.environmental_energy_efficiency_rating') | float(65) %}
+          {% set arbitration = states('sensor.equipment_arbitration_effectiveness') | float(100) %}
+          {{ ((efficiency + arbitration) / 2) | round(0, default=75) }}
+        attributes:
+          efficiency_component: "{{ states('sensor.environmental_energy_efficiency_rating') }}%"
+          arbitration_component: "{{ states('sensor.equipment_arbitration_effectiveness') }}%"
+          calculation: "Average of efficiency and arbitration scores"
+
+      - name: "Energy Aware Dehumidifier Priority"
+        unique_id: energy_aware_dehumidifier_priority
+        state: >
+          {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+          {% if humidity > 58 %}
+            High Priority
+          {% elif humidity > 55 %}
+            Medium Priority
+          {% else %}
+            Low Priority
+          {% endif %}
+        attributes:
+          current_humidity: "{{ states('sensor.average_house_humidity_combined') }}%"
+          threshold_status: >
+            {% set humidity = states('sensor.average_house_humidity_combined') | float(50) %}
+            {% if humidity > 60 %}
+              Emergency Activation
+            {% elif humidity > 58 %}
+              Preventive Activation
+            {% else %}
+              Normal Operation
+            {% endif %}
+          gulf_coast_ceiling: "60%"
+
+      - name: "Energy Aware HVAC Efficiency"
+        unique_id: energy_aware_hvac_efficiency
+        unit_of_measurement: "%"
+        state: >
+          {% set current_temp = states('sensor.average_house_temperature_combined') | float(75) %}
+          {% set target_temp = states('input_number.foundation_cooling_target_home') | float(74) %}
+          {% set temp_delta = (current_temp - target_temp) | abs %}
+          {% if temp_delta <= 1.0 %}
+            95
+          {% elif temp_delta <= 2.0 %}
+            85
+          {% elif temp_delta <= 3.0 %}
+            75
+          {% else %}
+            65
+          {% endif %}
+        attributes:
+          temperature_variance: >-
+            {{ ((states('sensor.average_house_temperature_combined') | float(75)) -
+                (states('input_number.foundation_cooling_target_home') | float(74)))
+                | round(1, default=0) }}°F
+          current_temperature: "{{ states('sensor.average_house_temperature_combined') }}°F"
+          target_temperature: "{{ states('input_number.foundation_cooling_target_home') }}°F"
+          efficiency_grade: >
+            {% set current_temp = states('sensor.average_house_temperature_combined') | float(75) %}
+            {% set target_temp = states('input_number.foundation_cooling_target_home') | float(74) %}
+            {% set temp_delta = (current_temp - target_temp) | abs %}
+            {% if temp_delta <= 1.0 %}
+              Excellent
+            {% elif temp_delta <= 2.0 %}
+              Good
+            {% elif temp_delta <= 3.0 %}
+              Fair
+            {% else %}
+              Needs Attention
+            {% endif %}
+
+      # =======================================================================
+      # COORDINATION SENSORS - SYSTEM STATUS MONITORING
+      # =======================================================================
+
+      - name: "Coordination Energy Feedback Enhanced"
+        unique_id: coordination_energy_feedback_enhanced
+        state: >
+          {% set phase3_active = is_state('binary_sensor.phase3_baseline_tracking_operational', 'on') %}
+          {% set savings = states('sensor.phase3_combined_daily_savings') | float(0) %}
+          {% if phase3_active and savings > 3.0 %}
+            Excellent Performance - High Savings
+          {% elif phase3_active and savings > 2.0 %}
+            Good Performance - Moderate Savings
+          {% elif phase3_active %}
+            Basic Performance - Low Savings
+          {% else %}
+            System Inactive
+          {% endif %}
+        attributes:
+          daily_savings: "{{ states('sensor.phase3_combined_daily_savings') }} kWh"
+          phase3_status: "{{ states('binary_sensor.phase3_baseline_tracking_operational') }}"
+          annual_projection: >-
+            {{ state_attr('sensor.phase3_combined_daily_savings', 'annual_savings_projection')
+               | default('N/A') }}
+
+      # =======================================================================
+      # MISSING DASHBOARD SUPPORT SENSORS
+      # =======================================================================
+
+      - name: "Energy Efficiency Percentage"
+        unique_id: energy_efficiency_percentage_dashboard
+        unit_of_measurement: "%"
+        state: >
+          {% set temp_efficiency = states('sensor.energy_aware_hvac_efficiency') | float(75) %}
+          {% set arbitration_efficiency = states('sensor.equipment_arbitration_effectiveness') | float(95) %}
+          {{ ((temp_efficiency + arbitration_efficiency) / 2) | round(1, default=75) }}
+        attributes:
+          temperature_efficiency: "{{ states('sensor.energy_aware_hvac_efficiency') }}%"
+          arbitration_efficiency: "{{ states('sensor.equipment_arbitration_effectiveness') }}%"
+          status: >
+            {% set eff =
+              ((states('sensor.energy_aware_hvac_efficiency') | float(75) +
+                states('sensor.equipment_arbitration_effectiveness') | float(95)) / 2)
+              | round(1, default=75) %}
+            {% if eff >= 90 %}Excellent
+            {% elif eff >= 80 %}Good
+            {% elif eff >= 70 %}Fair
+            {% else %}Needs Attention
+            {% endif %}
+
+      - name: "Safety System Status"
+        unique_id: safety_system_status_dashboard
+        state: >
+          {% if not is_state('input_boolean.climate_safety_master_enabled', 'on') %}
+            Safety Master Disabled
+          {% elif is_state('binary_sensor.humidity_emergency_condition', 'on') %}
+            Emergency: High Humidity
+          {% elif is_state('binary_sensor.heat_index_emergency', 'on') %}
+            Emergency: High Heat Index
+          {% else %}
+            All Safety Systems Normal
+          {% endif %}
+        icon: >
+          {% if is_state('binary_sensor.humidity_emergency_condition', 'on') or
+                is_state('binary_sensor.heat_index_emergency', 'on') %}
+            mdi:alert-circle
+          {% elif is_state('input_boolean.climate_safety_master_enabled', 'on') %}
+            mdi:shield-check
+          {% else %}
+            mdi:shield-off
+          {% endif %}
+        attributes:
+          humidity_emergency: "{{ states('binary_sensor.humidity_emergency_condition') }}"
+          heat_index_emergency: "{{ states('binary_sensor.heat_index_emergency') }}"
+          safety_master_enabled: "{{ states('input_boolean.climate_safety_master_enabled') }}"
+          current_humidity: "{{ states('sensor.average_house_humidity_combined') }}%"
+          humidity_ceiling: "60%"
+
+      # =======================================================================
+      # HUMIDITY PRECISION STANDARDIZATION (Phase 3.2)
+      # =======================================================================
+      # Round all humidity displays to whole numbers for consistent UX
+
+      - name: "TempHumidSensor1 Humidity"
+        unique_id: temphumidsensor1_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_living_room_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_living_room_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor2 Humidity"
+        unique_id: temphumidsensor2_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_dining_room_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_dining_room_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor3 Humidity"
+        unique_id: temphumidsensor3_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_outdoor_back_porch_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_outdoor_back_porch_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor4 Humidity"
+        unique_id: temphumidsensor4_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_kitchen_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_kitchen_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor7 Humidity"
+        unique_id: temphumidsensor7_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_guest_bathroom_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_guest_bathroom_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor8 Humidity"
+        unique_id: temphumidsensor8_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_guest_bedroom_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_guest_bedroom_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor10 Humidity"
+        unique_id: temphumidsensor10_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_master_bedroom_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_master_bedroom_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor12 Humidity"
+        unique_id: temphumidsensor12_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_master_closet_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_master_closet_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor13 Humidity"
+        unique_id: temphumidsensor13_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_laundry_room_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_laundry_room_humidity', 'unavailable') }}"
+
+      - name: "TempHumidSensor14 Humidity"
+        unique_id: temphumidsensor14_humidity_rounded
+        unit_of_measurement: "%"
+        device_class: humidity
+        state: "{{ states('sensor.climate_office_humidity') | float(50) | round(0) }}"
+        availability: "{{ not is_state('sensor.climate_office_humidity', 'unavailable') }}"
+
+  - binary_sensor:
+      # =======================================================================
+      # DASHBOARD BINARY SENSORS - SYSTEM HEALTH & OCCUPANCY
+      # =======================================================================
+
+      - name: "Smart Occupancy Control Active"
+        unique_id: smart_occupancy_control_active
+        state: >
+          {{ is_state('input_boolean.motion_enhanced_precision_cooling_enabled', 'on') and
+             is_state('input_boolean.motion_follow_me_enabled', 'on') }}
+        attributes:
+          motion_cooling: "{{ states('input_boolean.motion_enhanced_precision_cooling_enabled') }}"
+          follow_me: "{{ states('input_boolean.motion_follow_me_enabled') }}"
+          precision_reduction: "{{ states('input_number.motion_precision_cooling_reduction') }}°F"
+
+      - name: "Uptime Target Met"
+        unique_id: uptime_target_met
+        state: >
+          {{ states('sensor.system_uptime_percentage') | float(100) >= 99.5 }}
+        attributes:
+          current_uptime: "{{ states('sensor.system_uptime_percentage') }}%"
+          target: "99.5%"
+          status: >
+            {% if states('sensor.system_uptime_percentage') | float(100) >= 99.5 %}
+              Target Met
+            {% else %}
+              Below Target
+            {% endif %}
+
+      - name: "Motion Follow-Me Display"
+        unique_id: motion_follow_me_focus_display
+        icon: mdi:target-account
+        state: >
+          {% set active = state_attr('binary_sensor.motion_follow_me_focus', 'active_zones') %}
+          {% if active in [None, '', 'No motion detected'] %}
+            Standby
+          {% else %}
+            {% set zones = active.split(',') %}
+            {{ zones[0].strip() }}
+          {% endif %}
+        availability: >
+          {{ states('binary_sensor.motion_follow_me_focus') not in ['unknown', 'unavailable', None] }}
+        attributes:
+          active_zones: >-
+            {{ state_attr('binary_sensor.motion_follow_me_focus', 'active_zones')
+               | default('No motion detected') }}
+          sensors_online: >-
+            {{ state_attr('binary_sensor.motion_follow_me_focus', 'sensors_online')
+               | default('15/15') }}
+          last_updated: "{{ now().strftime('%I:%M %p') }}"
+
+      # =======================================================================
+      # MOTION SENSOR UX ENHANCEMENT (Phase 3.3)
+      # =======================================================================
+      # Enhanced motion sensors with dynamic icons and clear status text
+
+      - name: "Living Room Motion Enhanced"
+        unique_id: presencesensor1_motion_enhanced
+        state: >
+          {% if is_state('binary_sensor.presencesensor1_motion', 'on') %}
+            Motion Detected
+          {% elif is_state('binary_sensor.presencesensor1_motion', 'unavailable') %}
+            Sensor Offline
+          {% else %}
+            No Motion
+          {% endif %}
+        icon: >
+          {% if is_state('binary_sensor.presencesensor1_motion', 'on') %}mdi:run
+          {% elif is_state('binary_sensor.presencesensor1_motion', 'unavailable') %}mdi:motion-sensor-off
+          {% else %}mdi:walk{% endif %}
+        availability: "{{ not is_state('binary_sensor.presencesensor1_motion', 'unknown') }}"
+
+      - name: "Dining Room Motion Enhanced"
+        unique_id: presencesensor2_motion_enhanced
+        state: >
+          {% if is_state('binary_sensor.presencesensor2_motion', 'on') %}
+            Motion Detected
+          {% elif is_state('binary_sensor.presencesensor2_motion', 'unavailable') %}
+            Sensor Offline
+          {% else %}
+            No Motion
+          {% endif %}
+        icon: >
+          {% if is_state('binary_sensor.presencesensor2_motion', 'on') %}mdi:run
+          {% elif is_state('binary_sensor.presencesensor2_motion', 'unavailable') %}mdi:motion-sensor-off
+          {% else %}mdi:walk{% endif %}
+        availability: "{{ not is_state('binary_sensor.presencesensor2_motion', 'unknown') }}"
+
+      - name: "Kitchen Motion Enhanced"
+        unique_id: presencesensor3_motion_enhanced
+        state: >
+          {% if is_state('binary_sensor.presencesensor3_motion', 'on') %}
+            Motion Detected
+          {% elif is_state('binary_sensor.presencesensor3_motion', 'unavailable') %}
+            Sensor Offline
+          {% else %}
+            No Motion
+          {% endif %}
+        icon: >
+          {% if is_state('binary_sensor.presencesensor3_motion', 'on') %}mdi:run
+          {% elif is_state('binary_sensor.presencesensor3_motion', 'unavailable') %}mdi:motion-sensor-off
+          {% else %}mdi:walk{% endif %}
+        availability: "{{ not is_state('binary_sensor.presencesensor3_motion', 'unknown') }}"
+
+      - name: "Master Hallway Motion Enhanced"
+        unique_id: presencesensor4_motion_enhanced
+        state: >
+          {% if is_state('binary_sensor.presencesensor4_motion', 'on') %}
+            Motion Detected
+          {% elif is_state('binary_sensor.presencesensor4_motion', 'unavailable') %}
+            Sensor Offline
+          {% else %}
+            No Motion
+          {% endif %}
+        icon: >
+          {% if is_state('binary_sensor.presencesensor4_motion', 'on') %}mdi:run
+          {% elif is_state('binary_sensor.presencesensor4_motion', 'unavailable') %}mdi:motion-sensor-off
+          {% else %}mdi:walk{% endif %}
+        availability: "{{ not is_state('binary_sensor.presencesensor4_motion', 'unknown') }}"
+
+      - name: "Master Bedroom Motion Enhanced"
+        unique_id: presencesensor13_motion_enhanced
+        state: >
+          {% if is_state('binary_sensor.presencesensor13_motion', 'on') %}
+            Motion Detected
+          {% elif is_state('binary_sensor.presencesensor13_motion', 'unavailable') %}
+            Sensor Offline
+          {% else %}
+            No Motion
+          {% endif %}
+        icon: >
+          {% if is_state('binary_sensor.presencesensor13_motion', 'on') %}mdi:run
+          {% elif is_state('binary_sensor.presencesensor13_motion', 'unavailable') %}mdi:motion-sensor-off
+          {% else %}mdi:walk{% endif %}
+        availability: "{{ not is_state('binary_sensor.presencesensor13_motion', 'unknown') }}"
+
+      # =======================================================================
+      # EMERGENCY SCRIPT TIMESTAMP TRACKING (Phase 3.4)
+      # =======================================================================
+      # Track last execution time for emergency safety protocols
+
+      - name: "Emergency Humidity Override Timestamp"
+        # Entity: sensor.emergency_humidity_override_timestamp
+        unique_id: emergency_humidity_override_timestamp
+        state: >
+          {% set last_run = states('input_datetime.emergency_humidity_override_last_run') %}
+          {% if last_run in ['unknown', 'unavailable', 'none'] %}
+            Never executed
+          {% else %}
+            {% set run_time = strptime(last_run, '%Y-%m-%d %H:%M:%S') %}
+            {{ run_time.strftime('%b %d, %I:%M %p') }}
+          {% endif %}
+        attributes:
+          purpose: "60% Humidity Emergency Protocol"
+          last_execution: "{{ states('input_datetime.emergency_humidity_override_last_run') }}"
+          safety_critical: true
+
+      - name: "Emergency Cooling Boost Timestamp"
+        # Entity: sensor.emergency_cooling_boost_timestamp
+        unique_id: emergency_cooling_boost_timestamp
+        state: >
+          {% set last_run = states('input_datetime.emergency_cooling_boost_last_run') %}
+          {% if last_run in ['unknown', 'unavailable', 'none'] %}
+            Never executed
+          {% else %}
+            {% set run_time = strptime(last_run, '%Y-%m-%d %H:%M:%S') %}
+            {{ run_time.strftime('%b %d, %I:%M %p') }}
+          {% endif %}
+        attributes:
+          purpose: "Gulf Coast Heat Emergency Response"
+          last_execution: "{{ states('input_datetime.emergency_cooling_boost_last_run') }}"
+          safety_critical: true
+
+      - name: "Climate System Restart Timestamp"
+        # Entity: sensor.climate_system_restart_timestamp
+        unique_id: climate_system_restart_timestamp
+        state: >
+          {% set last_run = states('input_datetime.climate_system_restart_last_run') %}
+          {% if last_run in ['unknown', 'unavailable', 'none'] %}
+            Never executed
+          {% else %}
+            {% set run_time = strptime(last_run, '%Y-%m-%d %H:%M:%S') %}
+            {{ run_time.strftime('%b %d, %I:%M %p') }}
+          {% endif %}
+        attributes:
+          purpose: "System Recovery Protocol"
+          last_execution: "{{ states('input_datetime.climate_system_restart_last_run') }}"
+          safety_critical: true
+
+      - name: "Reset All Overrides Timestamp"
+        # Entity: sensor.reset_all_overrides_timestamp
+        unique_id: reset_all_overrides_timestamp
+        state: >
+          {% set last_run = states('input_datetime.reset_all_overrides_last_run') %}
+          {% if last_run in ['unknown', 'unavailable', 'none'] %}
+            Never executed
+          {% else %}
+            {% set run_time = strptime(last_run, '%Y-%m-%d %H:%M:%S') %}
+            {{ run_time.strftime('%b %d, %I:%M %p') }}
+          {% endif %}
+        attributes:
+          purpose: "Clear All Emergency States"
+          last_execution: "{{ states('input_datetime.reset_all_overrides_last_run') }}"
+          safety_critical: false
+
+# =============================================================================
+# DASHBOARD BASELINE STATISTICS
+# =============================================================================
+
+sensor:
+  - platform: statistics
+    name: "Energy Cost Daily Projection 7d Mean"
+    entity_id: sensor.energy_cost_daily_projection
+    state_characteristic: mean
+    max_age:
+      days: 7
+  - platform: statistics
+    name: "Energy Efficiency Percentage 7d Mean"
+    entity_id: sensor.energy_efficiency_percentage
+    state_characteristic: mean
+    max_age:
+      days: 7
+
+# =============================================================================
+# DASHBOARD INPUT HELPERS
+# =============================================================================
+
+input_boolean:
+  # Dashboard feature flags for easy testing and rollback
+  climate_dashboard_analytics_enabled:
+    name: "🔬 Climate Dashboard Analytics"
+    initial: true
+    icon: mdi:chart-line
+
+  climate_dashboard_motion_enhanced:
+    name: "🏃 Enhanced Motion Display"
+    initial: true
+    icon: mdi:motion-sensor
+
+  # Missing entities referenced by dashboard
+  energy_optimization_enabled:
+    name: "Energy Optimization"
+    initial: true
+    icon: mdi:lightning-bolt
+
+  # Mobile dashboard optimization flags
+  mobile_responsive_layout_enabled:
+    name: "📱 Mobile Responsive Layout"
+    initial: true
+    icon: mdi:responsive
+
+  mobile_text_optimization_enabled:
+    name: "📝 Mobile Text Optimization"
+    initial: true
+    icon: mdi:format-text-variant
+
+# =============================================================================
+# ADDITIONAL MISSING ENTITY PLACEHOLDERS
+# =============================================================================
+
+# Dashboard Missing Entity Aliases (fixes dashboard entity reference errors)
+input_number:
+  dehumidifier_cooldown:
+    name: "Dehumidifier Cooldown Period"
+    min: 5
+    max: 60
+    initial: 10
+    step: 1
+    unit_of_measurement: "min"
+    icon: mdi:pause-circle
+
+  heat_index_emergency_threshold:
+    name: "Heat Index Emergency Threshold"
+    min: 95
+    max: 120
+    initial: 105
+    step: 1
+    unit_of_measurement: "°F"
+    icon: mdi:thermometer-alert
+
+  # Enhanced Controls Tab Support Entities
+  hvac_max_runtime_summer:
+    name: "HVAC Max Runtime (Summer)"
+    min: 15
+    max: 90
+    initial: 45
+    step: 5
+    unit_of_measurement: "min"
+    icon: mdi:clock-outline
+
+  dehumidifier_max_runtime:
+    name: "Dehumidifier Max Runtime"
+    min: 15
+    max: 90
+    initial: 45
+    step: 5
+    unit_of_measurement: "min"
+    icon: mdi:clock-outline
+
+  # Motion control aliases for dashboard
+  motion_precision_cooling_reduction:
+    name: "Motion Precision Cooling Reduction"
+    min: 0.5
+    max: 3.0
+    initial: 1.0
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:thermometer-minus
+
+  # Mobile optimization settings
+  mobile_card_title_max_length:
+    name: "Mobile Card Title Max Length"
+    min: 12
+    max: 25
+    initial: 18
+    step: 1
+    unit_of_measurement: "chars"
+    icon: mdi:format-size
+
+input_datetime:
+  # Maintenance tracking entities referenced by dashboard
+  hvac_filter_last_changed:
+    name: "HVAC Filter Last Changed"
+    has_date: true
+    has_time: false
+
+  dehumidifier_filter_last_changed:
+    name: "Dehumidifier Filter Last Changed"
+    has_date: true
+    has_time: false
+
+  hvac_last_professional_service:
+    name: "HVAC Last Professional Service"
+    has_date: true
+    has_time: false
+
+  dehumidifier_last_service:
+    name: "Dehumidifier Last Service"
+    has_date: true
+    has_time: false
+
+  # Phase 3.4 - Emergency Script Timestamp Tracking
+  emergency_humidity_override_last_run:
+    name: "Emergency Humidity Override Timestamp"
+    has_date: true
+    has_time: true
+
+  emergency_cooling_boost_last_run:
+    name: "Emergency Cooling Boost Timestamp"
+    has_date: true
+    has_time: true
+
+  climate_system_restart_last_run:
+    name: "Climate System Restart Timestamp"
+    has_date: true
+    has_time: true
+
+  reset_all_overrides_last_run:
+    name: "Reset All Overrides Timestamp"
+    has_date: true
+    has_time: true
+
+input_text:
+  dashboard_notes:
+    name: "Dashboard Notes"
+    initial: "Phase 2 Complete: Mobile-responsive layout with zero text truncation"
+    max: 255
+    icon: mdi:note-text

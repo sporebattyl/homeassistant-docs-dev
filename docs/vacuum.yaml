@@ -1,0 +1,327 @@
+---
+# Home Assistant Automations for Dreame L10s Ultra Vacuum
+#
+# This file contains automations for controlling room cleaning,
+# handling errors, and scheduling sequential tasks.
+#
+# Key Features:
+# - Centralized logic (`vacuum_room_automation`) handles parameter setting
+#   and execution.
+# - Individual automations trigger the central logic for specific rooms/modes.
+# - Error notification automation alerts on vacuum issues.
+# - Daily kitchen cleanup sequence vacuums, waits, then mops.
+
+# Centralized Vacuum Room Automation
+# Trigger the Automation: When you trigger the vacuum_room_automation
+# automation (e.g., from another automation or a button press), you can
+# now pass in:
+#   room_segment: A single number (e.g., 8) or a list of numbers
+#     (e.g., [8, 9, 10]).
+#   cleaning_mode: sweeping or mopping.
+#   suction_level: quiet, turbo, or standard (only used if
+#     cleaning_mode is sweeping).
+#   mop_pad_humidity: wet, dry, or standard (only used if
+#     cleaning_mode is mopping).
+#   repeats: Number of times to clean the segment(s), defaults to 1.
+
+- id: vacuum_room_automation
+  alias: Vacuum Room (Central Logic)
+  description: Vacuums or mops a specified room based on passed parameters.
+  trigger: []
+  condition: []
+  action:
+    # Wait until the vacuum is ready (charging, sleeping, or idle) before
+    # starting. If it's not ready within 1 hour, the automation run will stop.
+    - wait_template: >-
+        {{ is_state('sensor.l10s_ultra_status', 'charging') or
+           is_state('sensor.l10s_ultra_status', 'sleeping') or
+           is_state('sensor.l10s_ultra_status', 'idle') }}
+      timeout: "01:00:00"
+      continue_on_timeout: false  # Changed from true for safety
+    # Set the overall cleaning mode (sweeping or mopping)
+    - service: select.select_option
+      data:
+        option: "{{ cleaning_mode }}"
+      target:
+        entity_id: select.l10s_ultra_cleaning_mode
+    # Set mode-specific parameters (suction for sweeping, humidity for mopping)
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ cleaning_mode == 'sweeping' }}"
+          sequence:
+            - service: select.select_option
+              data:
+                # Default added for robustness
+                option: "{{ suction_level | default('standard') }}"
+              target:
+                entity_id: select.l10s_ultra_suction_level
+        - conditions:
+            - condition: template
+              value_template: "{{ cleaning_mode == 'mopping' }}"
+          sequence:
+            - service: select.select_option
+              data:
+                # Default added for robustness
+                option: "{{ mop_pad_humidity | default('standard') }}"
+              target:
+                entity_id: select.l10s_ultra_mop_pad_humidity
+    # Start the cleaning task for the specified segments
+    - service: dreame_vacuum.vacuum_clean_segment
+      data:
+        segments: "{{ room_segment }}"
+        # Use variable 'repeats', default to 1
+        repeats: "{{ repeats | default(1) }}"
+      target:
+        device_id: 72a307905df4391bbe20e7cc4282e2cb
+  mode: single
+
+# Vacuum Office
+- id: vacuum_office
+  alias: Vacuum Office
+  description: Vacuums Office (Room 8)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 8
+        cleaning_mode: sweeping
+        suction_level: quiet
+        # mop_pad_humidity removed (not relevant for sweeping)
+  mode: single
+
+# Mop Office
+- id: mop_office
+  alias: Mop Office
+  description: Mops Office (Room 8)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 8
+        cleaning_mode: mopping
+        mop_pad_humidity: wet
+        # suction_level removed (not relevant for mopping)
+  mode: single
+
+# Vacuum Master Bedroom
+- id: vacuum_master_bedroom
+  alias: Vacuum Master Bedroom
+  description: Vacuums Master Bedroom (Room 1)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 1
+        cleaning_mode: sweeping
+        suction_level: turbo
+        # mop_pad_humidity removed (not relevant for sweeping)
+  mode: single
+
+# Vacuum Master Bath (Scheduled)
+- id: vacuum_master_bath
+  alias: Vacuum Master Bath on weekdays
+  description: Vacuum master bath [29, 28, 2] on weekdays at 10:00.
+  trigger:
+    - platform: time
+      at: "10:00:00"
+  condition:
+    - condition: time
+      weekday:
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: [29, 28, 2]
+        cleaning_mode: sweeping
+        suction_level: quiet
+        # mop_pad_humidity removed (not relevant for sweeping)
+  mode: single
+
+# Mop Master Bath (Scheduled)
+- id: mop_master_bath
+  alias: Mop Master Bath on weekdays
+  description: Mop Master Bath [29, 28, 2] on weekdays at 11:00.
+  trigger:
+    - platform: time
+      at: "11:00:00"
+  condition:
+    - condition: time
+      weekday:
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: [29, 28, 2]
+        cleaning_mode: mopping
+        mop_pad_humidity: wet
+        # suction_level removed (not relevant for mopping)
+  mode: single
+
+# Vacuum Dining Room
+- id: vacuum_dining_room
+  alias: Vacuum Dining Room
+  description: Vacuums Dining Room (Room 14)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 14
+        cleaning_mode: sweeping
+        suction_level: quiet
+        # mop_pad_humidity removed (not relevant for sweeping)
+  mode: single
+
+# Mop Dining Room
+- id: mop_dining_room
+  alias: Mop Dining Room
+  description: Mops Dining Room (Room 14)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 14
+        cleaning_mode: mopping
+        mop_pad_humidity: wet
+        # suction_level removed (not relevant for mopping)
+  mode: single
+
+# Vacuum Kitchen
+- id: vacuum_kitchen
+  alias: Vacuum Kitchen
+  description: Vacuums Kitchen (Room 13)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 13
+        cleaning_mode: sweeping
+        suction_level: quiet
+        # mop_pad_humidity removed (not relevant for sweeping)
+  mode: single
+
+# Mop Kitchen
+- id: mop_kitchen
+  alias: Mop Kitchen
+  description: Mops Kitchen (Room 13)
+  trigger: []
+  condition: []
+  action:
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_room_automation
+      data:
+        room_segment: 13
+        cleaning_mode: mopping
+        mop_pad_humidity: wet
+        # suction_level removed (not relevant for mopping)
+  mode: single
+
+# Vacuum Error Notification
+- id: vacuum_error_notification
+  alias: Vacuum Error Notification
+  description: Notify when vacuum encounters an error
+  trigger:
+    - platform: state
+      entity_id: sensor.l10s_ultra_status
+      to: error
+  action:
+    - service: notify.mobile_app_drews_iphone
+      data:
+        title: "Vacuum Error"
+        # Attempt to get a more descriptive error if available
+        message: >-
+          The vacuum reported an error.
+          Status: {{ states('sensor.l10s_ultra_status') }}.
+          {% set error_code = state_attr('sensor.l10s_ultra_status', 'error_code') %}
+          {% if error_code %}
+            Error Code: {{ error_code }}.
+          {% endif %}
+          {% set error_description = state_attr('sensor.l10s_ultra_status', 'error') %}
+          {% if error_description %}
+            Description: {{ error_description }}.
+          {% endif %}
+  # Mode single is usually fine here, but 'queued' or 'parallel' could be
+  # considered if errors might rapidly flap.
+  mode: single
+
+# Schedule Daily Kitchen Cleanup (Improved Sequence)
+- id: daily_kitchen_cleanup
+  alias: Daily Kitchen Cleanup
+  description: Vacuum and then mop kitchen after dinner, waiting for vacuum completion.
+  trigger:
+    - platform: time
+      at: "21:00:00"
+  condition:
+    - condition: time
+      weekday:
+        - mon
+        - tue
+        - wed
+        - thu
+        - fri
+        - sat
+        - sun
+  action:
+    # 1. Trigger Kitchen Vacuuming
+    - service: automation.trigger
+      target:
+        entity_id: automation.vacuum_kitchen
+      # Relies on vacuum_kitchen's defined parameters
+      data: {}
+
+    # 2. Wait for Vacuuming to Finish (Return to Dock/Idle)
+    # Waits up to 1.5 hours. If it times out (vacuum stuck/error/offline),
+    # stops here.
+    - wait_template: >-
+        {{ is_state('sensor.l10s_ultra_status', 'charging') or
+           is_state('sensor.l10s_ultra_status', 'sleeping') or
+           is_state('sensor.l10s_ultra_status', 'idle') }}
+      timeout: "01:30:00"
+      continue_on_timeout: false
+
+    # 3. Short Delay (Optional - allows dock to potentially prepare for mopping)
+    - delay:
+        minutes: 2
+
+    # 4. Trigger Kitchen Mopping (only runs if vacuuming finished successfully)
+    - service: automation.trigger
+      target:
+        entity_id: automation.mop_kitchen
+      # Relies on mop_kitchen's defined parameters
+      data: {}
+
+  # Prevent multiple cleanup sequences running concurrently
+  mode: single
+
+# End of Automations

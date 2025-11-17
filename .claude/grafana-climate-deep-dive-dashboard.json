@@ -1,0 +1,624 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "HASSBOT Climate Deep Dive",
+    "tags": ["climate", "temperature", "humidity", "hvac"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "All Temperature Sensors - Real Time",
+        "type": "timeseries",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "aqaratemphumid1_temperature",
+            "legendFormat": "Living Room",
+            "refId": "A"
+          },
+          {
+            "expr": "aqaratemphumid2_temperature", 
+            "legendFormat": "Kitchen",
+            "refId": "B"
+          },
+          {
+            "expr": "aqaratemphumid3_temperature",
+            "legendFormat": "Guest Bedroom", 
+            "refId": "C"
+          },
+          {
+            "expr": "aqaratemphumid4_temperature",
+            "legendFormat": "Rowan's Room",
+            "refId": "D"
+          },
+          {
+            "expr": "aqaratemphumid7_temperature",
+            "legendFormat": "Master Bedroom",
+            "refId": "E"
+          },
+          {
+            "expr": "aqaratemphumid9_temperature",
+            "legendFormat": "Office",
+            "refId": "F"
+          },
+          {
+            "expr": "aqaratemphumid5_temperature",
+            "legendFormat": "Guest Bathroom",
+            "refId": "G"
+          },
+          {
+            "expr": "aqaratemphumid6_temperature",
+            "legendFormat": "Master Bathroom",
+            "refId": "H"
+          },
+          {
+            "expr": "aqaratemphumid8_temperature",
+            "legendFormat": "Laundry",
+            "refId": "I"
+          },
+          {
+            "expr": "thermostat_current_temperature",
+            "legendFormat": "Thermostat",
+            "refId": "J"
+          },
+          {
+            "expr": "nursery_temperature",
+            "legendFormat": "Nursery",
+            "refId": "K"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 1,
+              "fillOpacity": 8,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 4,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "axisLabel": "Temperature (°F)",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "fahrenheit"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Thermostat"},
+              "properties": [
+                {"id": "custom.lineWidth", "value": 3},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "table", "placement": "right", "values": ["min", "max", "mean", "last"]},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Temperature Distribution Heatmap",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "targets": [
+          {
+            "expr": "aqaratemphumid1_temperature",
+            "legendFormat": "Living Room",
+            "refId": "A"
+          },
+          {
+            "expr": "aqaratemphumid2_temperature",
+            "legendFormat": "Kitchen",
+            "refId": "B"
+          },
+          {
+            "expr": "aqaratemphumid3_temperature",
+            "legendFormat": "Guest Bedroom",
+            "refId": "C"
+          },
+          {
+            "expr": "aqaratemphumid4_temperature",
+            "legendFormat": "Rowan's Room",
+            "refId": "D"
+          },
+          {
+            "expr": "aqaratemphumid7_temperature",
+            "legendFormat": "Master Bedroom",
+            "refId": "E"
+          },
+          {
+            "expr": "aqaratemphumid9_temperature",
+            "legendFormat": "Office",
+            "refId": "F"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "spectrum",
+              "scheme": "Turbo"
+            },
+            "custom": {
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "unit": "fahrenheit"
+          }
+        },
+        "options": {
+          "calculate": false,
+          "yAxis": {
+            "axisPlacement": "left"
+          },
+          "rowsFrame": {
+            "layout": "auto"
+          },
+          "tooltip": {"show": true, "yHistogram": false},
+          "legend": {"show": true},
+          "exemplars": {"color": "rgba(255,0,255,0.7)"}
+        }
+      },
+      {
+        "id": 3,
+        "title": "Humidity Analysis",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+        "targets": [
+          {
+            "expr": "house_humidity",
+            "legendFormat": "House Average",
+            "refId": "A"
+          },
+          {
+            "expr": "average_house_humidity",
+            "legendFormat": "Calculated Average",
+            "refId": "B"
+          },
+          {
+            "expr": "thermostat_current_humidity",
+            "legendFormat": "Thermostat Reading",
+            "refId": "C"
+          },
+          {
+            "expr": "outdoor_humidity",
+            "legendFormat": "Outdoor",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "axisLabel": "Humidity (%)",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "max": 100,
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 35},
+                {"color": "green", "value": 40},
+                {"color": "green", "value": 50},
+                {"color": "yellow", "value": 55},
+                {"color": "red", "value": 60}
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Outdoor"},
+              "properties": [
+                {"id": "custom.drawStyle", "value": "points"},
+                {"id": "custom.pointSize", "value": 6},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "gray"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "none"},
+          "legend": {"displayMode": "table", "placement": "bottom", "values": ["min", "max", "mean"]},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 4,
+        "title": "HVAC Performance Analysis",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 18},
+        "targets": [
+          {
+            "expr": "thermostat_current_temperature",
+            "legendFormat": "Current Temperature",
+            "refId": "A"
+          },
+          {
+            "expr": "hvac_target_temperature",
+            "legendFormat": "Target Temperature",
+            "refId": "B"
+          },
+          {
+            "expr": "weighted_house_temperature",
+            "legendFormat": "Weighted House Temp",
+            "refId": "C"
+          },
+          {
+            "expr": "climate_thermostat_hvac_action == 'cooling' ? 1 : 0",
+            "legendFormat": "HVAC Cooling",
+            "refId": "D"
+          },
+          {
+            "expr": "climate_thermostat_hvac_action == 'heating' ? 1 : 0",
+            "legendFormat": "HVAC Heating",
+            "refId": "E"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "fahrenheit"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Target Temperature"},
+              "properties": [
+                {"id": "custom.drawStyle", "value": "points"},
+                {"id": "custom.pointSize", "value": 8},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "HVAC Cooling"},
+              "properties": [
+                {"id": "custom.axisPlacement", "value": "right"},
+                {"id": "unit", "value": "short"},
+                {"id": "max", "value": 1.2},
+                {"id": "min", "value": -0.2},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}},
+                {"id": "custom.fillOpacity", "value": 30}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "HVAC Heating"},
+              "properties": [
+                {"id": "custom.axisPlacement", "value": "right"},
+                {"id": "unit", "value": "short"},
+                {"id": "max", "value": 1.2},
+                {"id": "min", "value": -0.2},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+                {"id": "custom.fillOpacity", "value": 30}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "none"},
+          "legend": {"displayMode": "table", "placement": "bottom", "values": ["min", "max", "mean"]},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Room-by-Room Climate Control",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 26},
+        "targets": [
+          {
+            "expr": "aqaratemphumid1_temperature",
+            "legendFormat": "Living Room Temp",
+            "refId": "A"
+          },
+          {
+            "expr": "aqaratemphumid1_humidity",
+            "legendFormat": "Living Room Humidity",
+            "refId": "B"
+          },
+          {
+            "expr": "living_room_fan_target_temperature",
+            "legendFormat": "Living Room Target",
+            "refId": "C"
+          },
+          {
+            "expr": "aqaratemphumid9_temperature",
+            "legendFormat": "Office Temp",
+            "refId": "D"
+          },
+          {
+            "expr": "aqaratemphumid9_humidity", 
+            "legendFormat": "Office Humidity",
+            "refId": "E"
+          },
+          {
+            "expr": "office_fan_target_temperature",
+            "legendFormat": "Office Target",
+            "refId": "F"
+          },
+          {
+            "expr": "aqaratemphumid7_temperature",
+            "legendFormat": "Master Bedroom Temp",
+            "refId": "G"
+          },
+          {
+            "expr": "aqaratemphumid7_humidity",
+            "legendFormat": "Master Bedroom Humidity",
+            "refId": "H"
+          },
+          {
+            "expr": "master_bedroom_fan_target_temperature",
+            "legendFormat": "Master Bedroom Target",
+            "refId": "I"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "groupBy",
+            "options": {
+              "fields": {
+                "Time": {"aggregations": [], "operation": "groupby"},
+                "Value": {"aggregations": ["lastNotNull"], "operation": "aggregate"}
+              }
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {}
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 80}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "/.*Temp.*/"},
+              "properties": [
+                {"id": "unit", "value": "fahrenheit"},
+                {"id": "custom.displayMode", "value": "color-background"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "blue", "value": null},
+                    {"color": "green", "value": 70},
+                    {"color": "yellow", "value": 76},
+                    {"color": "red", "value": 80}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "/.*Humidity.*/"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "custom.displayMode", "value": "color-background"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "red", "value": null},
+                    {"color": "yellow", "value": 35},
+                    {"color": "green", "value": 40},
+                    {"color": "green", "value": 50},
+                    {"color": "yellow", "value": 55},
+                    {"color": "red", "value": 60}
+                  ]
+                }}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true
+        }
+      },
+      {
+        "id": 6,
+        "title": "Temperature Variance Analysis",
+        "type": "stat",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 26},
+        "targets": [
+          {
+            "expr": "max(aqaratemphumid1_temperature, aqaratemphumid2_temperature, aqaratemphumid3_temperature, aqaratemphumid4_temperature, aqaratemphumid7_temperature, aqaratemphumid9_temperature) - min(aqaratemphumid1_temperature, aqaratemphumid2_temperature, aqaratemphumid3_temperature, aqaratemphumid4_temperature, aqaratemphumid7_temperature, aqaratemphumid9_temperature)",
+            "legendFormat": "Temperature Spread",
+            "refId": "A"
+          },
+          {
+            "expr": "abs(thermostat_current_temperature - hvac_target_temperature)",
+            "legendFormat": "Target vs Actual",
+            "refId": "B"
+          },
+          {
+            "expr": "abs(house_temperature - weighted_house_temperature)",
+            "legendFormat": "Calculation Variance",
+            "refId": "C"
+          },
+          {
+            "expr": "climate_energy_efficiency_score_2",
+            "legendFormat": "Efficiency Score",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 2},
+                {"color": "orange", "value": 4},
+                {"color": "red", "value": 6}
+              ]
+            },
+            "unit": "fahrenheit"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Efficiency Score"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "red", "value": null},
+                    {"color": "orange", "value": 40},
+                    {"color": "yellow", "value": 60},
+                    {"color": "green", "value": 80},
+                    {"color": "dark-green", "value": 95}
+                  ]
+                }}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "6h",
+          "value": "6h"
+        },
+        "description": "Time range for analysis",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Time Range",
+        "multi": false,
+        "name": "time_range",
+        "options": [
+          {"selected": false, "text": "1h", "value": "1h"},
+          {"selected": true, "text": "6h", "value": "6h"},
+          {"selected": false, "text": "12h", "value": "12h"},
+          {"selected": false, "text": "24h", "value": "24h"},
+          {"selected": false, "text": "7d", "value": "7d"}
+        ],
+        "query": "1h,6h,12h,24h,7d",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "schemaVersion": 30,
+  "version": 1,
+  "links": [
+    {
+      "title": "Home Overview",
+      "url": "/d/home-overview/",
+      "type": "dashboards"
+    },
+    {
+      "title": "Energy Management",
+      "url": "/d/energy-management/",
+      "type": "dashboards"
+    },
+    {
+      "title": "System Health",
+      "url": "/d/system-health/",
+      "type": "dashboards"
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+# =============================================================================
+# PROFESSIONAL HUMIDITY CONTROL SCRIPT - Gulf Coast Aprilaire E130 Integration
+# =============================================================================
+# CRITICAL: Designed for relay-controlled Aprilaire E130 dehumidifier
+# Gulf Coast Climate: 60% humidity ceiling for mold prevention
+# Equipment Arbitration: Coordinates with ML14XC1 AC unit
+# =============================================================================
+
+# PROFESSIONAL HUMIDITY CONTROL - Aprilaire E130 Gulf Coast Optimized
+professional_humidity_control:
+  alias: "Professional Humidity Control"
+  description: "Gulf Coast optimized humidity control for Aprilaire E130"
+  fields:
+    target_humidity:
+      name: "Target Humidity"
+      description: "Target humidity percentage (40-60%)"
+      required: true
+      selector:
+        number:
+          min: 40
+          max: 60
+          step: 1
+          unit_of_measurement: "%"
+    mode_name:
+      name: "Control Mode"
+      description: "Mode triggering humidity control"
+      required: true
+      selector:
+        text:
+    timeout_minutes:
+      name: "Timeout Minutes"
+      description: "Maximum runtime (default 30 minutes)"
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 5
+          unit_of_measurement: "min"
+  
+  sequence:
+    # Phase 1: Validate parameters and system readiness
+    - condition: template
+      value_template: "{{ target_humidity | int >= 40 and target_humidity | int <= 60 }}"
+      
+    - condition: template
+      value_template: "{{ not is_state('switch.dehumidifier_relay_l1', 'unavailable') }}"
+      
+    - service: logbook.log
+      data:
+        name: "Professional Humidity Control"
+        message: "{{ mode_name }} mode: Setting humidity target to {{ target_humidity }}%"
+        entity_id: switch.dehumidifier_relay_l1
+        
+    # Phase 2: Set humidity target for monitoring
+    - action: input_number.set_value
+      target:
+        entity_id: input_number.humidity_target
+      data:
+        value: "{{ target_humidity | int }}"
+        
+    # Phase 3: Equipment arbitration check
+    - variables:
+        current_humidity: "{{ states('sensor.average_house_humidity_enhanced_15_sensor') | float(55) }}"
+        ac_cooling: "{{ is_state('climate.thermostat', 'cooling') }}"
+        dehumid_power: "{{ states('sensor.dehumidifier_relay_l1_power') | float(0) }}"
+        total_load: "{{ dehumid_power + (3500 if ac_cooling else 0) }}"
+        emergency_humidity: "{{ current_humidity > 60 }}"
+        
+    # Phase 4: Humidity control logic
+    - choose:
+        # Emergency: Humidity > 60% - All equipment authorized
+        - conditions:
+            - condition: template
+              value_template: "{{ emergency_humidity }}"
+          sequence:
+            - service: notify.mobile_app_drews_iphone
+              data:
+                title: "🚨 HUMIDITY EMERGENCY"
+                message: "{{ current_humidity | round(1) }}% > 60% ceiling. Emergency dehumidification active."
+                data:
+                  priority: "critical"
+                  tag: "humidity_emergency"
+            - action: switch.turn_on
+              target:
+                entity_id: switch.dehumidifier_relay_l1
+                
+        # Standard operation: Check if dehumidification needed
+        - conditions:
+            - condition: template
+              value_template: "{{ current_humidity > target_humidity | int }}"
+          sequence:
+            # Equipment arbitration for non-emergency
+            - choose:
+                # High load: Skip dehumidifier if AC running and total load > 5000W
+                - conditions:
+                    - condition: template
+                      value_template: "{{ ac_cooling and total_load > 5000 }}"
+                  sequence:
+                    - service: notify.mobile_app_drews_iphone
+                      data:
+                        title: "⚡ Humidity Control - AC Priority"
+                        message: "{{ mode_name }}: High load ({{ total_load | int }}W). AC dehumidification active."
+                        data:
+                          tag: "humidity_arbitration"
+              default:
+                # Normal operation: Start dehumidifier
+                - action: switch.turn_on
+                  target:
+                    entity_id: switch.dehumidifier_relay_l1
+                - service: notify.mobile_app_drews_iphone
+                  data:
+                    title: "🌊 Humidity Control Active"
+                    message: "{{ mode_name }}: {{ current_humidity | round(1) }}% → {{ target_humidity }}% target"
+                    data:
+                      tag: "humidity_control"
+      default:
+        # Target already achieved
+        - service: notify.mobile_app_drews_iphone
+          data:
+            title: "✅ Humidity Target Achieved"
+            message: "{{ mode_name }}: {{ current_humidity | round(1) }}% meets {{ target_humidity }}% target"
+            data:
+              tag: "humidity_achieved"
+        - stop: "Target humidity already achieved"
+        
+    # Phase 5: Wait for target achievement with timeout protection
+    - wait_template: >-
+        {{ states('sensor.average_house_humidity_enhanced_15_sensor') | float(100) <= target_humidity | int }}
+      timeout:
+        minutes: "{{ timeout_minutes | int }}"
+      continue_on_timeout: true
+
+    # Phase 6: Completion handling
+    - variables:
+        humidity_below_target: >-
+          {{ states('sensor.average_house_humidity_enhanced_15_sensor') | float(100) <= target_humidity | int }}
+        current_humidity_value: "{{ states('sensor.average_house_humidity_enhanced_15_sensor') }}"
+
+    - choose:
+        # Success: Target achieved
+        - conditions:
+            - condition: template
+              value_template: "{{ humidity_below_target }}"
+          sequence:
+            - action: switch.turn_off
+              target:
+                entity_id: switch.dehumidifier_relay_l1
+            - service: notify.mobile_app_drews_iphone
+              data:
+                title: "✅ {{ mode_name }} Humidity Control Complete"
+                message: "Target {{ target_humidity }}% achieved. Current: {{ current_humidity_value }}%"
+                data:
+                  tag: "humidity_success"
+      default:
+        # Timeout: Safety shutdown
+        - action: switch.turn_off
+          target:
+            entity_id: switch.dehumidifier_relay_l1
+        - service: notify.mobile_app_drews_iphone
+          data:
+            title: "⚠️ {{ mode_name }} Humidity Control Timeout"
+            message: "{{ timeout_minutes }}min timeout reached. Current: {{ current_humidity_value }}% (Target: {{ target_humidity }}%)"
+            data:
+              priority: "high"
+              tag: "humidity_timeout"
+              
+  mode: parallel
+  max: 2  # Allow up to 2 concurrent humidity control operations

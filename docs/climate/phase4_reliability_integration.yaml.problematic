@@ -1,0 +1,365 @@
+# ==================================================================================================
+# PHASE 4 RELIABILITY & MONITORING - INTEGRATION CONFIGURATION
+#
+# CONTEXT: Configuration loader for all Phase 4 reliability and monitoring systems
+#
+# PURPOSE: This file integrates all seven Phase 4 reliability systems into your
+#          League City climate control configuration. Add this to your main
+#          configuration.yaml to enable all Phase 4 functionality.
+#
+# INTEGRATION METHOD: Add the following to your configuration.yaml:
+#
+#   homeassistant:
+#     packages:
+#       phase4_integration: !include phase4_reliability_integration.yaml
+#
+# ==================================================================================================
+
+# --------------------------------------------------------------------------------------------------
+# Package Integration - Loads all Phase 4 reliability systems
+# --------------------------------------------------------------------------------------------------
+homeassistant:
+  packages:
+    weather_failsafe_safeguard: !include weather_failsafe_safeguard.yaml
+    humidity_emergency_protocol: !include humidity_emergency_protocol.yaml
+    control_failure_watchdog: !include control_failure_watchdog.yaml
+    system_health_monitoring: !include system_health_monitoring.yaml
+    performance_metrics_dashboard: !include performance_metrics_dashboard.yaml
+    predictive_maintenance: !include predictive_maintenance.yaml
+    gulf_coast_weather_monitoring: !include gulf_coast_weather_monitoring.yaml
+
+# --------------------------------------------------------------------------------------------------
+# Phase 4 Status Dashboard Group
+# --------------------------------------------------------------------------------------------------
+group:
+  phase4_reliability_status:
+    name: "Phase 4 Reliability Status"
+    entities:
+      - sensor.climate_system_health_score
+      - sensor.system_performance_grade
+      - sensor.system_uptime_percentage
+      - sensor.weather_api_status
+      - sensor.humidity_emergency_level
+      - sensor.control_system_status
+      - sensor.maintenance_priority_summary
+      - sensor.gulf_coast_comfort_level
+
+  phase4_emergency_systems:
+    name: "Phase 4 Emergency Systems"
+    entities:
+      - input_boolean.weather_api_failsafe_active
+      - input_boolean.humidity_emergency_active
+      - input_boolean.control_failure_watchdog_active
+      - binary_sensor.extreme_heat_index_alert
+      - binary_sensor.tropical_weather_risk_high
+      - binary_sensor.hurricane_season_active
+
+  phase4_performance_metrics:
+    name: "Phase 4 Performance Metrics"
+    entities:
+      - sensor.daily_energy_efficiency_score
+      - sensor.comfort_index
+      - sensor.gulf_coast_performance_index
+      - sensor.estimated_daily_energy_cost
+      - sensor.energy_savings_estimate
+      - sensor.monthly_savings_projection
+
+  phase4_maintenance_tracking:
+    name: "Phase 4 Maintenance Tracking"
+    entities:
+      - sensor.hvac_filter_days_remaining
+      - sensor.hvac_service_days_remaining
+      - sensor.dehumidifier_service_days_remaining
+      - binary_sensor.hvac_filter_maintenance_due
+      - binary_sensor.hvac_service_maintenance_due
+      - binary_sensor.dehumidifier_maintenance_due
+
+# --------------------------------------------------------------------------------------------------
+# Phase 4 System Integration Validation
+# --------------------------------------------------------------------------------------------------
+sensor:
+  - platform: template
+    sensors:
+      phase4_system_integration_status:
+        friendly_name: "Phase 4 System Integration Status"
+        value_template: >-
+          {% set systems = [
+            'weather_failsafe_safeguard',
+            'humidity_emergency_protocol', 
+            'control_failure_watchdog',
+            'system_health_monitoring',
+            'performance_metrics_dashboard',
+            'predictive_maintenance',
+            'gulf_coast_weather_monitoring'
+          ] %}
+          
+          {% set active_systems = 0 %}
+          
+          {# Check if key entities from each system exist #}
+          {% if states('sensor.weather_api_status') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {% if states('sensor.humidity_emergency_level') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {% if states('sensor.control_system_status') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {% if states('sensor.climate_system_health_score') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {% if states('sensor.system_performance_grade') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {% if states('sensor.maintenance_priority_summary') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {% if states('sensor.gulf_coast_comfort_level') != 'unknown' %}
+            {% set active_systems = active_systems + 1 %}
+          {% endif %}
+          
+          {{ active_systems }}/7 Systems Active
+          {% if active_systems == 7 %}
+            - FULLY OPERATIONAL
+          {% elif active_systems >= 5 %}
+            - MOSTLY OPERATIONAL
+          {% elif active_systems >= 3 %}
+            - PARTIALLY OPERATIONAL  
+          {% else %}
+            - INTEGRATION ISSUES
+          {% endif %}
+        icon_template: >-
+          {% set status = states('sensor.phase4_system_integration_status') %}
+          {% if 'FULLY OPERATIONAL' in status %}
+            mdi:check-circle
+          {% elif 'MOSTLY OPERATIONAL' in status %}
+            mdi:check-circle-outline
+          {% elif 'PARTIALLY OPERATIONAL' in status %}
+            mdi:alert-circle-outline
+          {% else %}
+            mdi:alert-circle
+          {% endif %}
+
+      phase4_reliability_target_status:
+        friendly_name: "Phase 4 Reliability Target Status"
+        value_template: >-
+          {% set uptime = states('sensor.system_uptime_percentage')|float(0) %}
+          {% set health = states('sensor.climate_system_health_score')|int(0) %}
+          {% set target_uptime = 99.5 %}
+          {% set target_health = 95 %}
+          
+          Target Uptime: {{ uptime }}% (Target: {{ target_uptime }}%)
+          Target Health: {{ health }}% (Target: {{ target_health }}%)
+          
+          {% if uptime >= target_uptime and health >= target_health %}
+            ✅ ALL TARGETS ACHIEVED
+          {% elif uptime >= target_uptime %}
+            ⚠️ Uptime Target Met, Health Below Target
+          {% elif health >= target_health %}
+            ⚠️ Health Target Met, Uptime Below Target  
+          {% else %}
+            ❌ BOTH TARGETS BELOW REQUIREMENTS
+          {% endif %}
+
+# --------------------------------------------------------------------------------------------------
+# Phase 4 Integration Validation Automation
+# --------------------------------------------------------------------------------------------------
+automation:
+  - id: phase4_integration_validation
+    alias: "[Phase4] Integration - System Validation on Startup"
+    description: "Validates Phase 4 system integration on Home Assistant startup"
+    trigger:
+      - platform: homeassistant
+        event: start
+    condition: []
+    action:
+      - delay:
+          minutes: 2  # Allow systems to initialize
+      - service: persistent_notification.create
+        data:
+          title: "🚀 PHASE 4 RELIABILITY SYSTEMS - STARTUP VALIDATION"
+          message: |
+            **LEAGUE CITY CLIMATE SYSTEM PHASE 4 INITIALIZATION**
+            
+            **Integration Status:** {{ states('sensor.phase4_system_integration_status') }}
+            
+            **System Components:**
+            ✅ Weather API Failsafe: {{ 'Active' if states('sensor.weather_api_status') != 'unknown' else 'Inactive' }}
+            ✅ Humidity Emergency: {{ 'Active' if states('sensor.humidity_emergency_level') != 'unknown' else 'Inactive' }}
+            ✅ Control Watchdog: {{ 'Active' if states('sensor.control_system_status') != 'unknown' else 'Inactive' }}
+            ✅ Health Monitoring: {{ 'Active' if states('sensor.climate_system_health_score') != 'unknown' else 'Inactive' }}
+            ✅ Performance Dashboard: {{ 'Active' if states('sensor.system_performance_grade') != 'unknown' else 'Inactive' }}
+            ✅ Predictive Maintenance: {{ 'Active' if states('sensor.maintenance_priority_summary') != 'unknown' else 'Inactive' }}
+            ✅ Gulf Coast Weather: {{ 'Active' if states('sensor.gulf_coast_comfort_level') != 'unknown' else 'Inactive' }}
+            
+            **Reliability Targets:**
+            {{ states('sensor.phase4_reliability_target_status') }}
+            
+            **Current System Status:**
+            - Overall Health: {{ states('sensor.climate_system_health_score') }}%
+            - Performance Grade: {{ states('sensor.system_performance_grade') }}
+            - Uptime Target: {{ states('sensor.system_uptime_percentage') }}%
+            
+            **Phase 4 Mission: >99.5% Uptime with Bulletproof Reliability**
+            
+            Your League City climate system is now equipped with enterprise-grade reliability and monitoring.
+          notification_id: phase4_startup_validation
+      - service: script.notify_admin
+        data:
+          title: "🚀 Phase 4 Systems Active"
+          message: "{{ states('sensor.phase4_system_integration_status') }} - Reliability monitoring operational."
+          data:
+            priority: normal
+            tag: phase4_startup
+      - delay:
+          minutes: 10
+      - service: persistent_notification.dismiss
+        data:
+          notification_id: phase4_startup_validation
+    mode: single
+
+  - id: phase4_daily_status_report
+    alias: "[Phase4] Integration - Daily Reliability Report"
+    description: "Daily comprehensive Phase 4 system status report"
+    trigger:
+      - platform: time
+        at: "08:00:00"  # Morning report
+    condition: []
+    action:
+      - service: persistent_notification.create
+        data:
+          title: "📊 DAILY PHASE 4 RELIABILITY REPORT - {{ now().strftime('%A, %B %d') }}"
+          message: |
+            **LEAGUE CITY CLIMATE SYSTEM STATUS**
+            
+            **🎯 RELIABILITY SCORECARD:**
+            Overall Health: {{ states('sensor.climate_system_health_score') }}%
+            System Performance: {{ states('sensor.system_performance_grade') }}
+            Uptime Achievement: {{ states('sensor.system_uptime_percentage') }}%
+            
+            **⚡ PERFORMANCE METRICS:**
+            Energy Efficiency: {{ states('sensor.daily_energy_efficiency_score') }}%
+            Comfort Index: {{ states('sensor.comfort_index') }}%
+            Gulf Coast Performance: {{ states('sensor.gulf_coast_performance_index') }}%
+            Daily Savings: ${{ states('sensor.energy_savings_estimate') }}
+            
+            **🛡️ SAFETY SYSTEMS:**
+            Weather Failsafe: {{ 'Active' if is_state('input_boolean.weather_api_failsafe_active', 'on') else 'Normal' }}
+            Humidity Emergency: {{ states('sensor.humidity_emergency_level') }}
+            Control Watchdog: {{ 'Alert' if is_state('input_boolean.control_failure_watchdog_active', 'on') else 'Normal' }}
+            
+            **🔧 MAINTENANCE STATUS:**
+            Priority Tasks: {{ states('sensor.maintenance_priority_summary') }}
+            
+            **🌊 GULF COAST CONDITIONS:**
+            Weather Comfort: {{ states('sensor.gulf_coast_comfort_level') }}
+            Hurricane Season: {{ 'Active' if is_state('binary_sensor.hurricane_season_active', 'on') else 'Inactive' }}
+            Marine Influence: {{ states('sensor.marine_weather_influence') }}
+            
+            **TARGET STATUS:** {{ states('sensor.phase4_reliability_target_status') }}
+          notification_id: phase4_daily_report
+      - service: script.notify_admin
+        data:
+          title: "📊 Daily Phase 4 Report"
+          message: "Health: {{ states('sensor.climate_system_health_score') }}% | Grade: {{ states('sensor.system_performance_grade') }} | Uptime: {{ states('sensor.system_uptime_percentage') }}%"
+          data:
+            priority: low
+            tag: daily_report
+    mode: single
+
+# --------------------------------------------------------------------------------------------------
+# Phase 4 Script Helpers
+# --------------------------------------------------------------------------------------------------
+script:
+  phase4_system_health_check:
+    alias: "Phase 4 System Health Check"
+    description: "Manual comprehensive health check of all Phase 4 systems"
+    sequence:
+      - service: persistent_notification.create
+        data:
+          title: "🔍 PHASE 4 COMPREHENSIVE HEALTH CHECK"
+          message: |
+            **MANUAL SYSTEM DIAGNOSTIC INITIATED**
+            
+            **Integration Status:** {{ states('sensor.phase4_system_integration_status') }}
+            
+            **System Health Details:**
+            🏠 Climate Health: {{ states('sensor.climate_system_health_score') }}%
+            📈 Performance: {{ states('sensor.system_performance_grade') }}
+            ⏰ Uptime: {{ states('sensor.system_uptime_percentage') }}%
+            
+            **Emergency Systems Status:**
+            🌤️ Weather Failsafe: {{ states('sensor.weather_api_status') }}
+            💧 Humidity Control: {{ states('sensor.humidity_emergency_level') }}
+            🎛️ Control Systems: {{ states('sensor.control_system_status') }}
+            
+            **Reliability Targets:**
+            {{ states('sensor.phase4_reliability_target_status') }}
+            
+            **Gulf Coast Environment:**
+            🌊 Comfort Level: {{ states('sensor.gulf_coast_comfort_level') }}
+            🌡️ Heat Index: {{ states('sensor.gulf_coast_heat_index') }}°F
+            🏖️ Performance Index: {{ states('sensor.gulf_coast_performance_index') }}%
+            
+            **Maintenance Status:**
+            🔧 Priority Items: {{ states('sensor.maintenance_priority_summary') }}
+            
+            **System is {{ 'meeting' if states('sensor.system_uptime_percentage')|float(0) >= 99.5 else 'NOT meeting' }} the 99.5% reliability target.**
+          notification_id: phase4_health_check
+      - service: script.notify_admin
+        data:
+          title: "🔍 Phase 4 Health Check"
+          message: "Manual diagnostic complete. {{ states('sensor.phase4_system_integration_status') }}"
+          data:
+            priority: low
+            tag: health_check
+
+  phase4_emergency_status_check:
+    alias: "Phase 4 Emergency Status Check"
+    description: "Quick check of all emergency systems status"
+    sequence:
+      - service: persistent_notification.create
+        data:
+          title: "🚨 PHASE 4 EMERGENCY SYSTEMS STATUS"
+          message: |
+            **EMERGENCY SYSTEMS QUICK STATUS**
+            
+            **Active Emergencies:**
+            {% if is_state('input_boolean.weather_api_failsafe_active', 'on') %}
+            ⚠️ Weather API Failsafe: ACTIVE
+            {% endif %}
+            {% if is_state('input_boolean.humidity_emergency_active', 'on') %}
+            🚨 Humidity Emergency: {{ states('sensor.humidity_emergency_level') }}
+            {% endif %}
+            {% if is_state('input_boolean.control_failure_watchdog_active', 'on') %}
+            🛑 Control Failure: WATCHDOG ACTIVE
+            {% endif %}
+            {% if is_state('binary_sensor.extreme_heat_index_alert', 'on') %}
+            🔥 Extreme Heat: {{ states('sensor.gulf_coast_heat_index') }}°F Heat Index
+            {% endif %}
+            {% if is_state('binary_sensor.tropical_weather_risk_high', 'on') %}
+            🌀 Tropical Risk: HIGH RISK CONDITIONS
+            {% endif %}
+            
+            {% if not is_state('input_boolean.weather_api_failsafe_active', 'on') and 
+                 not is_state('input_boolean.humidity_emergency_active', 'on') and 
+                 not is_state('input_boolean.control_failure_watchdog_active', 'on') and
+                 not is_state('binary_sensor.extreme_heat_index_alert', 'on') and
+                 not is_state('binary_sensor.tropical_weather_risk_high', 'on') %}
+            ✅ **ALL EMERGENCY SYSTEMS NORMAL**
+            {% endif %}
+            
+            **System Health:** {{ states('sensor.climate_system_health_score') }}%
+            **Current Uptime:** {{ states('sensor.system_uptime_percentage') }}%
+          notification_id: phase4_emergency_check
+      - delay:
+          minutes: 5
+      - service: persistent_notification.dismiss
+        data:
+          notification_id: phase4_emergency_check

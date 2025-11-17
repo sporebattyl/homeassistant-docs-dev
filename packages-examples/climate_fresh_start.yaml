@@ -1,0 +1,2412 @@
+# Fresh Start Climate Automation Package
+# Reimagined dew-point-first climate control with manual override surfaces.
+
+input_boolean:
+  climate_automation_pause:
+    name: Pause Climate Automations
+    icon: mdi:pause-octagon
+  hvac_emergency_override:
+    name: HVAC Emergency Override
+    icon: mdi:hvac
+  manual_humidity_emergency_override:
+    name: Humidity Emergency Override
+    icon: mdi:water-alert
+  dehumidifier_service_mode:
+    name: Dehumidifier Service Mode
+    icon: mdi:tools
+  dehumidifier_runtime_lockout_active:
+    name: Dehumidifier Runtime Lockout
+    icon: mdi:timer-alert
+    initial: false
+
+input_number:
+  climate_occupied_cooling_low:
+    name: Occupied Cooling Low Target
+    min: 68
+    max: 76
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:thermometer
+    mode: slider
+    initial: 72
+  climate_occupied_cooling_high:
+    name: Occupied Cooling High Target
+    min: 72
+    max: 80
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:thermometer-plus
+    mode: slider
+    initial: 76
+  climate_occupied_humidity_max:
+    name: "Occupied Humidity Max"
+    min: 40
+    max: 65
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+    initial: 55
+  climate_unoccupied_cooling_target:
+    name: Unoccupied Cooling Target
+    min: 74
+    max: 82
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:thermostat
+    mode: slider
+    initial: 78
+  climate_dew_point_limit:
+    name: Dew Point Comfort Ceiling
+    min: 50
+    max: 60
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:water-thermometer
+    mode: slider
+    initial: 55
+  climate_dew_point_emergency:
+    name: Dew Point Emergency Threshold
+    min: 55
+    max: 65
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:alarm-light
+    mode: slider
+    initial: 57
+  climate_dew_point_lockout:
+    name: Dew Point Lockout Ceiling
+    min: 57
+    max: 68
+    step: 0.5
+    unit_of_measurement: "°F"
+    icon: mdi:shield-alert
+    mode: slider
+    initial: 60
+  climate_dehumidifier_runtime_cap:
+    name: Dehumidifier Max Runtime (min)
+    min: 15
+    max: 180
+    step: 5
+    unit_of_measurement: min
+    icon: mdi:timer-cog
+    mode: slider
+    initial: 90
+  climate_hvac_runtime_cap:
+    name: HVAC Max Runtime (min)
+    min: 15
+    max: 120
+    step: 5
+    unit_of_measurement: min
+    icon: mdi:timer-cog
+    mode: slider
+    initial: 45
+  climate_hvac_rest_window:
+    name: HVAC Rest Window (min)
+    min: 5
+    max: 30
+    step: 1
+    unit_of_measurement: min
+    icon: mdi:timer-off
+    mode: slider
+    initial: 10
+  climate_dehumidifier_rest_window:
+    name: Dehumidifier Rest Window (min)
+    min: 5
+    max: 30
+    step: 1
+    unit_of_measurement: min
+    icon: mdi:timer-off
+    mode: slider
+    initial: 10
+  foundation_cooling_target_home:
+    name: "Foundation Cooling Target (Home)"
+    min: 70
+    max: 80
+    step: 0.5
+    initial: 74
+    unit_of_measurement: "°F"
+    icon: mdi:thermometer
+    mode: slider
+  foundation_cooling_target_sleep:
+    name: "Foundation Cooling Target (Sleep)"
+    min: 68
+    max: 76
+    step: 0.5
+    initial: 73
+    unit_of_measurement: "°F"
+    icon: mdi:thermometer-chevron-down
+    mode: slider
+  foundation_humidity_max_home:
+    name: "Foundation Humidity Maximum (Home)"
+    min: 45
+    max: 60
+    step: 1
+    initial: 55
+    unit_of_measurement: "%"
+    icon: mdi:water-percent
+    mode: slider
+
+input_datetime:
+  hvac_last_cool_start:
+    name: HVAC Last Cool Start
+    has_date: true
+    has_time: true
+  hvac_last_cool_stop:
+    name: HVAC Last Cool Stop
+    has_date: true
+    has_time: true
+  dehumidifier_last_start:
+    name: Dehumidifier Last Start
+    has_date: true
+    has_time: true
+  dehumidifier_last_stop:
+    name: Dehumidifier Last Stop
+    has_date: true
+    has_time: true
+  emergency_humidity_override_timestamp:
+    name: Emergency Humidity Override Timestamp
+    has_date: true
+    has_time: true
+  reset_all_overrides_timestamp:
+    name: Reset All Overrides Timestamp
+    has_date: true
+    has_time: true
+
+input_text:
+  thermostat_previous_fan_mode:
+    name: Thermostat Previous Fan Mode
+    icon: mdi:fan
+
+template:
+  - binary_sensor:
+      - name: Climate Any Room Occupied
+        unique_id: climate_any_room_occupied
+        state: >-
+          {% set sensors = [
+            'binary_sensor.presence_living_room_presence',
+            'binary_sensor.presence_master_bedroom_presence',
+            'binary_sensor.presence_rowans_room_presence',
+            'binary_sensor.presence_kitchen_presence',
+            'binary_sensor.presence_office_presence',
+            'binary_sensor.presence_guest_bedroom_presence',
+            'binary_sensor.thermostat_motion',
+            'binary_sensor.thermostat_occupancy'
+          ] %}
+          {% set ns = namespace(active=false) %}
+          {% for sensor_id in sensors %}
+            {% if states(sensor_id) in ['on', 'home'] %}
+              {% set ns.active = true %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.active }}
+
+      - name: Humidity Emergency Condition
+        unique_id: humidity_emergency_condition
+        device_class: problem
+        state: >-
+          {% set dew_point = states('sensor.max_indoor_dew_point_enhanced') | float(0) %}
+          {% set emergency = states('input_number.climate_dew_point_emergency') | float(57) %}
+          {{ dew_point >= emergency }}
+
+      - name: Humidity Lockout Condition
+        unique_id: humidity_lockout_condition
+        device_class: problem
+        state: >-
+          {% set dew_point = states('sensor.max_indoor_dew_point_enhanced') | float(0) %}
+          {% set ceiling = states('input_number.climate_dew_point_lockout') | float(60) %}
+          {{ dew_point >= ceiling }}
+
+      - name: HVAC Rest Window Active
+        unique_id: hvac_rest_window_active
+        state: >-
+          {% set last_stop = states('input_datetime.hvac_last_cool_stop') %}
+          {% set rest_minutes = states('input_number.climate_hvac_rest_window') | float(10) %}
+          {% if last_stop in ['unknown', 'unavailable', ''] %}
+            false
+          {% else %}
+            {% set elapsed = (as_timestamp(now()) - as_timestamp(last_stop)) / 60 %}
+            {{ elapsed < rest_minutes }}
+          {% endif %}
+
+      - name: Dehumidifier Rest Window Active
+        unique_id: dehumidifier_rest_window_active
+        state: >-
+          {% set last_stop = states('input_datetime.dehumidifier_last_stop') %}
+          {% set rest_minutes = states('input_number.climate_dehumidifier_rest_window') | float(10) %}
+          {% if last_stop in ['unknown', 'unavailable', ''] %}
+            false
+          {% else %}
+            {% set elapsed = (as_timestamp(now()) - as_timestamp(last_stop)) / 60 %}
+            {{ elapsed < rest_minutes }}
+          {% endif %}
+
+      - name: Dehumidifier Power Mismatch
+        unique_id: dehumidifier_power_mismatch
+        device_class: problem
+        state: >-
+          {% set relay_on = is_state('switch.dehumidifier_relay_l1', 'on') %}
+          {% set outlet_on = is_state('switch.dehumidifier_outlet_switch', 'on') %}
+          {% set outlet_power = states('sensor.dehumidifier_outlet_switch_power') | float(0) %}
+          {% if relay_on and outlet_on %}
+            {{ outlet_power < 50 }}
+          {% elif relay_on and not outlet_on %}
+            true
+          {% else %}
+            false
+          {% endif %}
+
+      - name: HVAC Minimum Run Satisfied
+        unique_id: hvac_minimum_run_satisfied
+        state: >-
+          {% set last_start = states('input_datetime.hvac_last_cool_start') %}
+          {% if state_attr('climate.thermostat', 'hvac_action') == 'cooling' and
+                last_start not in ['unknown', 'unavailable', ''] %}
+            {% set elapsed = (as_timestamp(now()) - as_timestamp(last_start)) / 60 %}
+            {{ elapsed >= 15 }}
+          {% else %}
+            true
+          {% endif %}
+
+      - name: HVAC Runtime Exceeded
+        unique_id: hvac_runtime_exceeded
+        state: >-
+          {% set last_start = states('input_datetime.hvac_last_cool_start') %}
+          {% if state_attr('climate.thermostat', 'hvac_action') == 'cooling' and
+                last_start not in ['unknown', 'unavailable', ''] %}
+            {% set elapsed = (as_timestamp(now()) - as_timestamp(last_start)) / 60 %}
+            {% set cap = states('input_number.climate_hvac_runtime_cap') | float(45) %}
+            {{ elapsed >= cap }}
+          {% else %}
+            false
+          {% endif %}
+
+      - name: Dehumidifier Minimum Run Satisfied
+        unique_id: dehumidifier_minimum_run_satisfied
+        state: >-
+          {% if is_state('switch.dehumidifier_relay_l1', 'on') %}
+            {% set last_start = states('input_datetime.dehumidifier_last_start') %}
+            {% if last_start in ['unknown', 'unavailable', ''] %}
+              false
+            {% else %}
+              {% set elapsed = (as_timestamp(now()) - as_timestamp(last_start)) / 60 %}
+              {{ elapsed >= 15 }}
+            {% endif %}
+          {% else %}
+            true
+          {% endif %}
+
+      - name: Thermostat Cooling Active
+        unique_id: thermostat_cooling_action
+        device_class: running
+        icon: mdi:snowflake
+        state: >-
+          {{ state_attr('climate.thermostat', 'hvac_action') == 'cooling' }}
+
+      - name: Thermostat Heating Active
+        unique_id: thermostat_heating_action
+        device_class: running
+        icon: mdi:fire
+        state: >-
+          {{ state_attr('climate.thermostat', 'hvac_action') == 'heating' }}
+
+      - name: Thermostat Idle
+        unique_id: thermostat_idle_action
+        device_class: running
+        icon: mdi:hvac-off
+        state: >-
+          {{ state_attr('climate.thermostat', 'hvac_action') == 'idle' }}
+
+  - sensor:
+      - name: average_house_dew_point_enhanced
+        unit_of_measurement: "°F"
+        state: >-
+          {% from 'dew_point.jinja' import dew_point_f %}
+          {% set invalid = ['unknown', 'unavailable', 'none', None, '', 'nan'] %}
+          {% set sensor_list = [
+            'sensor.climate_living_room', 'sensor.climate_dining_room', 'sensor.climate_kitchen',
+            'sensor.climate_office', 'sensor.climate_rowans_room', 'sensor.climate_guest_bedroom',
+            'sensor.climate_guest_bathroom', 'sensor.climate_half_bathroom', 'sensor.climate_foyer_front_door',
+            'sensor.climate_foyer_garage', 'sensor.climate_master_bedroom', 'sensor.climate_master_bathroom',
+            'sensor.climate_master_closet', 'sensor.climate_laundry_room', 'sensor.thermostat_current'
+          ] %}
+          {% set totals = namespace(sum=0.0, count=0) %}
+          {% for sensor_base in sensor_list %}
+            {% set temp_val = states(sensor_base ~ '_temperature') %}
+            {% set humidity_val = states(sensor_base ~ '_humidity') %}
+            {% if temp_val not in invalid and humidity_val not in invalid %}
+              {% set candidate = dew_point_f(temp_val, humidity_val) %}
+              {% if candidate is not none %}
+                {% set totals.sum = totals.sum + (candidate | float) %}
+                {% set totals.count = totals.count + 1 %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if totals.count > 0 %}
+            {{ (totals.sum / totals.count) | round(2) }}
+          {% else %}
+            {% set fallback =
+              dew_point_f(states('sensor.thermostat_current_temperature'),
+                          states('sensor.thermostat_current_humidity')) %}
+            {{ fallback | round(2) if fallback is not none else 'unknown' }}
+          {% endif %}
+      - name: max_indoor_dew_point_enhanced
+        unit_of_measurement: "°F"
+        state: >-
+          {% from 'dew_point.jinja' import dew_point_f %}
+          {% set invalid = ['unknown', 'unavailable', 'none', None, '', 'nan'] %}
+          {% set sensor_list = [
+            'sensor.climate_living_room', 'sensor.climate_dining_room', 'sensor.climate_kitchen',
+            'sensor.climate_office', 'sensor.climate_rowans_room', 'sensor.climate_guest_bedroom',
+            'sensor.climate_guest_bathroom', 'sensor.climate_half_bathroom', 'sensor.climate_foyer_front_door',
+            'sensor.climate_foyer_garage', 'sensor.climate_master_bedroom', 'sensor.climate_master_bathroom',
+            'sensor.climate_master_closet', 'sensor.climate_laundry_room', 'sensor.thermostat_current'
+          ] %}
+          {% set max_dew = none %}
+          {% for sensor_base in sensor_list %}
+            {% set temp_val = states(sensor_base ~ '_temperature') %}
+            {% set humidity_val = states(sensor_base ~ '_humidity') %}
+            {% if temp_val not in invalid and humidity_val not in invalid %}
+              {% set candidate = dew_point_f(temp_val, humidity_val) %}
+              {% if candidate is not none %}
+                {% if max_dew is none or candidate > max_dew %}
+                  {% set max_dew = candidate %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if max_dew is not none %}
+            {{ max_dew | round(2) }}
+          {% else %}
+            {% set fallback =
+              dew_point_f(states('sensor.thermostat_current_temperature'),
+                          states('sensor.thermostat_current_humidity')) %}
+            {% if fallback is not none %}
+              {{ fallback | round(2) }}
+            {% else %}
+              unknown
+            {% endif %}
+          {% endif %}
+      - name: priority_dew_point_enhanced
+        unit_of_measurement: "°F"
+        state: >-
+          {% from 'dew_point.jinja' import dew_point_f %}
+          {% set invalid = ['unknown', 'unavailable', 'none', None, '', 'nan'] %}
+          {% set priority_zones = [
+            {'sensor': 'sensor.climate_living_room',
+             'presence': 'binary_sensor.presence_living_room_presence',
+             'label': 'Living Room'},
+            {'sensor': 'sensor.climate_dining_room',
+             'presence': 'binary_sensor.presence_dining_room_presence',
+             'label': 'Dining Room'},
+            {'sensor': 'sensor.climate_kitchen',
+             'presence': 'binary_sensor.presence_kitchen_presence',
+             'label': 'Kitchen'},
+            {'sensor': 'sensor.climate_office',
+             'presence': 'binary_sensor.presence_office_presence',
+             'label': 'Office'},
+            {'sensor': 'sensor.climate_master_bedroom',
+             'presence': 'binary_sensor.presence_master_bedroom_presence',
+             'label': 'Master Bedroom'},
+            {'sensor': 'sensor.climate_rowans_room',
+             'presence': 'binary_sensor.presence_rowans_room_presence',
+             'label': "Rowan's Room"}
+          ] %}
+          {% set occupied = [] %}
+          {% set fallback = [] %}
+          {% for zone in priority_zones %}
+            {% set temp_val = states(zone.sensor ~ '_temperature') %}
+            {% set humidity_val = states(zone.sensor ~ '_humidity') %}
+            {% if temp_val not in invalid and humidity_val not in invalid %}
+              {% set dew = dew_point_f(temp_val, humidity_val) %}
+              {% if dew is not none %}
+                {% set fallback = fallback + [dew] %}
+                {% if states(zone.presence) in ['on', 'home'] %}
+                  {% set occupied = occupied + [dew] %}
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {% if occupied %}
+            {{ (occupied | max) | round(2) }}
+          {% elif fallback %}
+            {{ (fallback | max) | round(2) }}
+          {% else %}
+            {% set alt = states('sensor.max_indoor_dew_point_enhanced') %}
+            {% if alt in invalid %}
+              unknown
+            {% else %}
+              {{ alt | float | round(2) }}
+            {% endif %}
+          {% endif %}
+        attributes:
+          occupied_rooms: >-
+            {% from 'dew_point.jinja' import dew_point_f %}
+            {% set invalid = ['unknown', 'unavailable', 'none', None, '', 'nan'] %}
+            {% set priority_zones = [
+              {'sensor': 'sensor.climate_living_room',
+               'presence': 'binary_sensor.presence_living_room_presence',
+               'label': 'Living Room'},
+              {'sensor': 'sensor.climate_dining_room',
+               'presence': 'binary_sensor.presence_dining_room_presence',
+               'label': 'Dining Room'},
+              {'sensor': 'sensor.climate_kitchen',
+               'presence': 'binary_sensor.presence_kitchen_presence',
+               'label': 'Kitchen'},
+              {'sensor': 'sensor.climate_office',
+               'presence': 'binary_sensor.presence_office_presence',
+               'label': 'Office'},
+              {'sensor': 'sensor.climate_master_bedroom',
+               'presence': 'binary_sensor.presence_master_bedroom_presence',
+               'label': 'Master Bedroom'},
+              {'sensor': 'sensor.climate_rowans_room',
+               'presence': 'binary_sensor.presence_rowans_room_presence',
+               'label': "Rowan's Room"}
+            ] %}
+            {% set names = [] %}
+            {% for zone in priority_zones %}
+              {% set temp_val = states(zone.sensor ~ '_temperature') %}
+              {% set humidity_val = states(zone.sensor ~ '_humidity') %}
+              {% if temp_val not in invalid and humidity_val not in invalid %}
+                {% set dew = dew_point_f(temp_val, humidity_val) %}
+                {% if dew is not none and states(zone.presence) in ['on', 'home'] %}
+                  {% set names = names + [zone.label] %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ names | join(', ') if names else 'None' }}
+
+      # Feels Like Temperature Sensors (Heat Index)
+      # Indoor sensors use Humidex formula (optimized for 68-78°F indoor range)
+      # Outdoor sensor uses NWS Heat Index formula (80°F+ threshold)
+
+      - name: "Feels Like - Living Room"
+        unique_id: feels_like_living_room
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_living_room_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_living_room_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_living_room_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_living_room_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Living Room"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_living_room_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_living_room_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Dining Room"
+        unique_id: feels_like_dining_room
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_dining_room_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_dining_room_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_dining_room_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_dining_room_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Dining Room"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_dining_room_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_dining_room_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Kitchen"
+        unique_id: feels_like_kitchen
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_kitchen_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_kitchen_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_kitchen_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_kitchen_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Kitchen"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_kitchen_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_kitchen_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Office"
+        unique_id: feels_like_office
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_office_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_office_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_office_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_office_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Office"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_office_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_office_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Master Bedroom"
+        unique_id: feels_like_master_bedroom
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_master_bedroom_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_master_bedroom_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_master_bedroom_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_master_bedroom_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Master Bedroom"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_master_bedroom_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_master_bedroom_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Rowan's Room"
+        unique_id: feels_like_rowans_room
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_rowans_room_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_rowans_room_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_rowans_room_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_rowans_room_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Rowan's Room"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_rowans_room_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_rowans_room_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Guest Bedroom"
+        unique_id: feels_like_guest_bedroom
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_guest_bedroom_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_guest_bedroom_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_guest_bedroom_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_guest_bedroom_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Guest Bedroom"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_guest_bedroom_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_guest_bedroom_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Master Bathroom"
+        unique_id: feels_like_master_bathroom
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_master_bathroom_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_master_bathroom_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_master_bathroom_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_master_bathroom_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Master Bathroom"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_master_bathroom_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_master_bathroom_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Guest Bathroom"
+        unique_id: feels_like_guest_bathroom
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_guest_bathroom_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_guest_bathroom_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_guest_bathroom_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_guest_bathroom_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Guest Bathroom"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_guest_bathroom_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_guest_bathroom_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Half Bathroom"
+        unique_id: feels_like_half_bathroom
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_half_bathroom_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_half_bathroom_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_half_bathroom_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_half_bathroom_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Half Bathroom"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_half_bathroom_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_half_bathroom_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Master Closet"
+        unique_id: feels_like_master_closet
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_master_closet_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_master_closet_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_master_closet_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_master_closet_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Master Closet"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_master_closet_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_master_closet_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Laundry Room"
+        unique_id: feels_like_laundry_room
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_laundry_room_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_laundry_room_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_laundry_room_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_laundry_room_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Laundry Room"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_laundry_room_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_laundry_room_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Foyer Front Door"
+        unique_id: feels_like_foyer_front_door
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_foyer_front_door_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_foyer_front_door_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_foyer_front_door_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_foyer_front_door_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Foyer Front Door"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_foyer_front_door_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_foyer_front_door_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      - name: "Feels Like - Foyer Garage"
+        unique_id: feels_like_foyer_garage
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_foyer_garage_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_foyer_garage_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T_f = states('sensor.climate_foyer_garage_temperature') | float(72) %}
+          {% set RH = states('sensor.climate_foyer_garage_humidity') | float(50) %}
+          {% set T_c = (T_f - 32) * 5/9 %}
+          {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+          {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+          {% set humidex_f = (humidex_c * 9/5) + 32 %}
+          {{ humidex_f | round(1) }}
+        attributes:
+          room: "Foyer Garage"
+          formula: "Humidex"
+          comfort_level: >
+            {% set T_f = states('sensor.climate_foyer_garage_temperature') | float(72) %}
+            {% set RH = states('sensor.climate_foyer_garage_humidity') | float(50) %}
+            {% set T_c = (T_f - 32) * 5/9 %}
+            {% set e = 6.112 * (10 ** (7.5 * T_c / (237.7 + T_c))) * (RH/100) %}
+            {% set humidex_c = T_c + 0.5555 * (e - 10) %}
+            {% set humidex_f = (humidex_c * 9/5) + 32 %}
+            {% if humidex_f < 80 %}Comfortable
+            {% elif humidex_f < 85 %}Noticeable Discomfort
+            {% elif humidex_f < 90 %}Uncomfortable
+            {% elif humidex_f < 105 %}Very Uncomfortable
+            {% else %}Dangerous{% endif %}
+
+      # House Average Feels Like (average of 14 indoor Humidex sensors)
+      - name: "Feels Like - House Average"
+        unique_id: feels_like_house_average
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.feels_like_living_room') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set sensors = [
+            'sensor.feels_like_living_room',
+            'sensor.feels_like_dining_room',
+            'sensor.feels_like_kitchen',
+            'sensor.feels_like_office',
+            'sensor.feels_like_master_bedroom',
+            'sensor.feels_like_rowans_room',
+            'sensor.feels_like_guest_bedroom',
+            'sensor.feels_like_master_bathroom',
+            'sensor.feels_like_guest_bathroom',
+            'sensor.feels_like_half_bathroom',
+            'sensor.feels_like_master_closet',
+            'sensor.feels_like_laundry_room',
+            'sensor.feels_like_foyer_front_door',
+            'sensor.feels_like_foyer_garage'
+          ] %}
+          {% set valid_sensors = sensors | select('has_value') | list %}
+          {% if valid_sensors | length > 0 %}
+            {{ (valid_sensors | map('states') | map('float') | sum / (valid_sensors | length)) | round(1) }}
+          {% else %}
+            {{ states('sensor.climate_living_room_temperature') | float(72) }}
+          {% endif %}
+        attributes:
+          rooms_counted: >
+            {% set sensors = [
+              'sensor.feels_like_living_room',
+              'sensor.feels_like_dining_room',
+              'sensor.feels_like_kitchen',
+              'sensor.feels_like_office',
+              'sensor.feels_like_master_bedroom',
+              'sensor.feels_like_rowans_room',
+              'sensor.feels_like_guest_bedroom',
+              'sensor.feels_like_master_bathroom',
+              'sensor.feels_like_guest_bathroom',
+              'sensor.feels_like_half_bathroom',
+              'sensor.feels_like_master_closet',
+              'sensor.feels_like_laundry_room',
+              'sensor.feels_like_foyer_front_door',
+              'sensor.feels_like_foyer_garage'
+            ] %}
+            {{ sensors | select('has_value') | list | length }}
+          formula: "Average of 14 indoor Humidex sensors"
+          comfort_level: >
+            {% set sensors = [
+              'sensor.feels_like_living_room',
+              'sensor.feels_like_dining_room',
+              'sensor.feels_like_kitchen',
+              'sensor.feels_like_office',
+              'sensor.feels_like_master_bedroom',
+              'sensor.feels_like_rowans_room',
+              'sensor.feels_like_guest_bedroom',
+              'sensor.feels_like_master_bathroom',
+              'sensor.feels_like_guest_bathroom',
+              'sensor.feels_like_half_bathroom',
+              'sensor.feels_like_master_closet',
+              'sensor.feels_like_laundry_room',
+              'sensor.feels_like_foyer_front_door',
+              'sensor.feels_like_foyer_garage'
+            ] %}
+            {% set valid_sensors = sensors | select('has_value') | list %}
+            {% if valid_sensors | length > 0 %}
+              {% set avg = (valid_sensors | map('states') | map('float') | sum / (valid_sensors | length)) %}
+              {% if avg < 80 %}Comfortable
+              {% elif avg < 85 %}Noticeable Discomfort
+              {% elif avg < 90 %}Uncomfortable
+              {% elif avg < 105 %}Very Uncomfortable
+              {% else %}Dangerous{% endif %}
+            {% else %}Comfortable{% endif %}
+
+      # Outdoor Feels Like (NWS Heat Index formula, 80°F+ threshold)
+      - name: "Feels Like - Outdoor"
+        unique_id: feels_like_outdoor
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: >
+          {{ states('sensor.climate_outdoor_back_porch_temperature') not in ['unknown', 'unavailable', 'none'] and
+             states('sensor.climate_outdoor_back_porch_humidity') not in ['unknown', 'unavailable', 'none'] }}
+        state: >
+          {% set T = states('sensor.climate_outdoor_back_porch_temperature') | float(80) %}
+          {% set RH = states('sensor.climate_outdoor_back_porch_humidity') | float(50) %}
+          {% if T < 80 %}
+            {{ T | round(1) }}
+          {% else %}
+            {% set HI = -42.379 + 2.04901523*T + 10.14333127*RH - 0.22475541*T*RH -
+                        0.00683783*T*T - 0.05481717*RH*RH + 0.00122874*T*T*RH +
+                        0.00085282*T*RH*RH - 0.00000199*T*T*RH*RH %}
+            {{ [T, HI] | max | round(1) }}
+          {% endif %}
+        attributes:
+          location: "Outdoor (Back Porch)"
+          formula: "NWS Heat Index"
+          outdoor_temp: >
+            {{ states('sensor.climate_outdoor_back_porch_temperature') | float(0) }}
+          outdoor_humidity: >
+            {{ states('sensor.climate_outdoor_back_porch_humidity') | float(0) }}
+          comfort_level: >
+            {% set T = states('sensor.climate_outdoor_back_porch_temperature') | float(80) %}
+            {% set RH = states('sensor.climate_outdoor_back_porch_humidity') | float(50) %}
+            {% if T < 80 %}
+              {% set HI = T %}
+            {% else %}
+              {% set HI = -42.379 + 2.04901523*T + 10.14333127*RH - 0.22475541*T*RH -
+                          0.00683783*T*T - 0.05481717*RH*RH + 0.00122874*T*T*RH +
+                          0.00085282*T*RH*RH - 0.00000199*T*T*RH*RH %}
+              {% set HI = [T, HI] | max %}
+            {% endif %}
+            {% if HI < 80 %}Comfortable
+            {% elif HI < 90 %}Caution
+            {% elif HI < 103 %}Extreme Caution
+            {% elif HI < 125 %}Danger
+            {% else %}Extreme Danger{% endif %}
+
+      - name: Environmental Intelligence Control
+        unique_id: environmental_intelligence_status_control
+        state: >-
+          {% set dew = states('sensor.max_indoor_dew_point_enhanced') | float(0) %}
+          {% set avg_temp = states('sensor.average_house_temperature_combined') | float(0) %}
+          {% set limit = states('input_number.climate_dew_point_limit') | float(55) %}
+          {% set emergency = states('input_number.climate_dew_point_emergency') | float(57) %}
+          {% set lockout = states('input_number.climate_dew_point_lockout') | float(60) %}
+          {% if dew >= lockout %}
+            emergency
+          {% elif dew >= emergency %}
+            severe
+          {% elif dew >= limit %}
+            caution
+          {% elif avg_temp > ((states('input_number.climate_occupied_cooling_high') | float(76)) + 1) %}
+            alert
+          {% else %}
+            stable
+          {% endif %}
+        attributes:
+          dew_point: "{{ states('sensor.max_indoor_dew_point_enhanced') }}"
+          avg_temperature: "{{ states('sensor.average_house_temperature_combined') }}"
+          avg_humidity: "{{ states('sensor.average_house_humidity_combined') }}"
+          rest_block_active: >-
+            {{ is_state('binary_sensor.hvac_rest_window_active', 'on') or
+               is_state('binary_sensor.dehumidifier_rest_window_active', 'on') }}
+          automation_paused: "{{ is_state('input_boolean.climate_automation_pause', 'on') }}"
+      - name: emergency_humidity_override_timestamp
+        state: >-
+          {% set stamp = states('input_datetime.emergency_humidity_override_timestamp') %}
+          {% if stamp in ['unknown', 'unavailable', ''] %}
+            unknown
+          {% else %}
+            {% set dt = as_datetime(stamp) %}
+            {% if dt %}
+              {{ as_local(dt).strftime('%Y-%m-%d %H:%M:%S') }}
+            {% else %}
+              unknown
+            {% endif %}
+          {% endif %}
+      - name: reset_all_overrides_timestamp
+        state: >-
+          {% set stamp = states('input_datetime.reset_all_overrides_timestamp') %}
+          {% if stamp in ['unknown', 'unavailable', ''] %}
+            unknown
+          {% else %}
+            {% set dt = as_datetime(stamp) %}
+            {% if dt %}
+              {{ as_local(dt).strftime('%Y-%m-%d %H:%M:%S') }}
+            {% else %}
+              unknown
+            {% endif %}
+          {% endif %}
+      - name: "Equipment Arbitration Emergency Count"
+        unique_id: equipment_arbitration_emergency_count
+        state: "{{ states('counter.equipment_arbitration_emergencies') | int(0) }}"
+        unit_of_measurement: "events"
+        icon: mdi:counter
+
+  - binary_sensor:
+      - name: climate_automation_active
+        state: >-
+          {{ is_state('input_boolean.climate_automation_pause', 'off') }}
+      - name: "Equipment Arbitration Emergency Active"
+        unique_id: equipment_arbitration_emergency_active
+        device_class: problem
+        state: >
+          {{ is_state('binary_sensor.humidity_emergency_condition', 'on')
+             or is_state('input_boolean.hvac_emergency_override', 'on') }}
+        availability: >
+          {{ has_value('binary_sensor.humidity_emergency_condition')
+             and has_value('input_boolean.hvac_emergency_override') }}
+
+script:
+  emergency_humidity_override:
+    alias: Emergency Dehumidification Override
+    description: Manual emergency humidity override with safety protocols
+    sequence:
+      - service: logbook.log
+        data:
+          name: Emergency Action
+          message: Manual humidity emergency override activated - Immediate dehumidification
+          entity_id: sensor.humidity_emergency_system_status
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.manual_humidity_emergency_override
+      - service: climate.set_humidity
+        target:
+          entity_id: climate.thermostat
+        data:
+          humidity: 50
+      - wait_template: >-
+          {% set target = 50 %}
+          {% set current = state_attr('climate.thermostat', 'target_humidity') %}
+          {% set fallback = state_attr('climate.thermostat', 'humidity') %}
+          {{ current == target or fallback == target }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Humidity Override Warning
+              message: Thermostat humidity target did not confirm within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Emergency Dehumidification Verification"
+              message: >-
+                Thermostat humidity target failed to confirm 50% within 30 seconds.
+                Review climate.thermostat state.
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'off'
+            sequence:
+              - service: switch.turn_on
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+        default: []
+      - service: notify.mobile_app_drews_iphone
+        data:
+          title: "🚨 Emergency Dehumidification Active"
+          message: >-
+            Manual humidity override activated - Target: 50% |
+            Current: {{ states('sensor.average_house_humidity_combined') }}%
+          data:
+            priority: high
+            sound: alarm.wav
+      - service: timer.start
+        target:
+          entity_id: timer.emergency_lockout_timer
+
+  emergency_cooling_boost:
+    alias: Emergency Cooling Boost
+    description: Emergency cooling boost with equipment protection
+    sequence:
+      - service: logbook.log
+        data:
+          name: Emergency Action
+          message: Emergency cooling boost activated - Immediate cooling response
+          entity_id: sensor.climate_safety_master_status
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.hvac_emergency_override
+      - service: climate.turn_on
+        target:
+          entity_id: climate.thermostat
+      - service: climate.set_hvac_mode
+        target:
+          entity_id: climate.thermostat
+        data:
+          hvac_mode: cool
+      - wait_template: >-
+          {{ state_attr('climate.thermostat', 'hvac_mode') == 'cool' or states('climate.thermostat') == 'cool' }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Emergency Cooling Boost Warning
+              message: Thermostat did not confirm cool mode within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Emergency Cooling Boost Verification"
+              message: "Thermostat failed to confirm cool mode within 30 seconds. Review climate.thermostat state."
+      - delay: "00:00:03"
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.thermostat
+        data:
+          temperature: 70
+      - wait_template: >-
+          {% set target = 70 %}
+          {% set temperature = state_attr('climate.thermostat', 'temperature') %}
+          {% set high = state_attr('climate.thermostat', 'target_temp_high') %}
+          {% set low = state_attr('climate.thermostat', 'target_temp_low') %}
+          {{ temperature == target or high == target or low == target }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Emergency Cooling Boost Warning
+              message: Thermostat cooling target did not confirm 70°F within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Emergency Cooling Boost Verification"
+              message: >-
+                Thermostat target temperature failed to confirm 70°F within 30 seconds.
+                Review thermostat status.
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ has_attr('climate.thermostat', 'fan_mode') }}"
+            sequence:
+              - service: climate.set_fan_mode
+                target:
+                  entity_id: climate.thermostat
+                data:
+                  fan_mode: high
+        default: []
+      - service: notify.mobile_app_drews_iphone
+        data:
+          title: "❄️ Emergency Cooling Active"
+          message: >-
+            Emergency cooling boost engaged - Target: 70°F |
+            Current: {{ states('sensor.average_house_temperature_combined') }}°F
+          data:
+            priority: high
+            sound: alarm.wav
+      - service: timer.start
+        target:
+          entity_id: timer.hvac_runtime_monitor
+
+  climate_system_restart:
+    alias: Restart Climate System
+    description: Restart climate system with graceful equipment shutdown and recovery
+    sequence:
+      - service: logbook.log
+        data:
+          name: System Action
+          message: Climate system restart initiated - Graceful equipment recovery
+          entity_id: sensor.climate_safety_master_status
+      - service: climate.turn_off
+        target:
+          entity_id: climate.thermostat
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'on'
+            sequence:
+              - service: switch.turn_off
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+        default: []
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.hvac_emergency_override
+            - input_boolean.manual_humidity_emergency_override
+      - service: timer.cancel
+        target:
+          entity_id:
+            - timer.hvac_runtime_monitor
+            - timer.hvac_cooldown_timer
+            - timer.dehumidifier_runtime_monitor
+            - timer.dehumidifier_cooldown_timer
+            - timer.emergency_lockout_timer
+      - delay:
+          seconds: 15
+      - service: climate.set_hvac_mode
+        target:
+          entity_id: climate.thermostat
+        data:
+          hvac_mode: heat_cool
+      - wait_template: >-
+          {{ state_attr('climate.thermostat', 'hvac_mode') == 'heat_cool' or states('climate.thermostat') == 'heat_cool' }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Climate Restart Warning
+              message: Thermostat did not confirm auto mode within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Climate System Restart Verification"
+              message: "Thermostat failed to confirm auto mode within 30 seconds during restart."
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ not is_state('climate.thermostat', 'auto') }}"
+            sequence:
+              - service: climate.set_hvac_mode
+                target:
+                  entity_id: climate.thermostat
+                data:
+                  hvac_mode: 'auto'
+              - service: logbook.log
+                data:
+                  name: "Climate System Restart"
+                  message: "Fallback: Manually restored thermostat to auto mode after wait_template timeout"
+                  entity_id: climate.thermostat
+      - delay: "00:00:03"
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.thermostat
+        data:
+          target_temp_high: "{{ states('input_number.climate_occupied_cooling_high') | float(76) }}"
+          target_temp_low: "{{ states('input_number.climate_occupied_cooling_low') | float(72) }}"
+      - wait_template: >-
+          {% set high_target = states('input_number.climate_occupied_cooling_high') | float(76) %}
+          {% set low_target = states('input_number.climate_occupied_cooling_low') | float(72) %}
+          {% set high_state = state_attr('climate.thermostat', 'target_temp_high') %}
+          {% set low_state = state_attr('climate.thermostat', 'target_temp_low') %}
+          {{ (high_state | float(high_target)) | round(1) == (high_target | round(1)) and
+             (low_state | float(low_target)) | round(1) == (low_target | round(1)) }}
+        timeout: "00:00:45"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Climate Restart Warning
+              message: Thermostat setpoints did not confirm occupied band within 45 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Climate System Restart Verification"
+              message: "Thermostat failed to confirm occupied cooling setpoints within 45 seconds during restart."
+      - service: climate.set_humidity
+        target:
+          entity_id: climate.thermostat
+        data:
+          humidity: "{{ states('input_number.climate_occupied_humidity_max') | float(55) }}"
+      - wait_template: >-
+          {% set target = states('input_number.climate_occupied_humidity_max') | float(55) %}
+          {% set current = state_attr('climate.thermostat', 'target_humidity') %}
+          {% set fallback = state_attr('climate.thermostat', 'humidity') %}
+          {{ (current | float(target)) | round(0) == (target | round(0)) or
+             (fallback | float(target)) | round(0) == (target | round(0)) }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Climate Restart Warning
+              message: Thermostat humidity target did not confirm within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Climate System Restart Verification"
+              message: "Thermostat failed to confirm humidity target within 30 seconds during restart."
+      - service: notify.mobile_app_drews_iphone
+        data:
+          title: "🔄 Climate System Restarted"
+          message: Climate system restart complete - Normal operation resumed
+          data:
+            priority: normal
+
+  reset_all_overrides:
+    alias: Reset All Emergency Overrides
+    description: Reset all emergency overrides and restore normal climate operation
+    sequence:
+      - service: logbook.log
+        data:
+          name: System Reset
+          message: All emergency overrides reset - Normal climate operation restored
+          entity_id: sensor.climate_safety_master_status
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.hvac_emergency_override
+            - input_boolean.manual_humidity_emergency_override
+      - service: timer.cancel
+        target:
+          entity_id:
+            - timer.hvac_runtime_monitor
+            - timer.hvac_cooldown_timer
+            - timer.dehumidifier_runtime_monitor
+            - timer.dehumidifier_cooldown_timer
+            - timer.emergency_lockout_timer
+      - service: climate.set_hvac_mode
+        target:
+          entity_id: climate.thermostat
+        data:
+          hvac_mode: heat_cool
+      - wait_template: >-
+          {{ state_attr('climate.thermostat', 'hvac_mode') == 'heat_cool' or states('climate.thermostat') == 'heat_cool' }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Override Reset Warning
+              message: Thermostat did not confirm auto mode within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Reset Overrides Verification"
+              message: "Thermostat failed to confirm auto mode within 30 seconds while resetting overrides."
+      - delay: "00:00:03"
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.thermostat
+        data:
+          target_temp_high: "{{ states('input_number.climate_occupied_cooling_high') | float(76) }}"
+          target_temp_low: "{{ states('input_number.climate_occupied_cooling_low') | float(72) }}"
+      - wait_template: >-
+          {% set high_target = states('input_number.climate_occupied_cooling_high') | float(76) %}
+          {% set low_target = states('input_number.climate_occupied_cooling_low') | float(72) %}
+          {% set high_state = state_attr('climate.thermostat', 'target_temp_high') %}
+          {% set low_state = state_attr('climate.thermostat', 'target_temp_low') %}
+          {{ (high_state | float(high_target)) | round(1) == (high_target | round(1)) and
+             (low_state | float(low_target)) | round(1) == (low_target | round(1)) }}
+        timeout: "00:00:45"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Override Reset Warning
+              message: Thermostat setpoints did not confirm occupied band within 45 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Reset Overrides Verification"
+              message: >-
+                Thermostat failed to confirm occupied cooling setpoints within 45 seconds
+                while resetting overrides.
+      - service: climate.set_humidity
+        target:
+          entity_id: climate.thermostat
+        data:
+          humidity: "{{ states('input_number.climate_occupied_humidity_max') | float(55) }}"
+      - wait_template: >-
+          {% set target = states('input_number.climate_occupied_humidity_max') | float(55) %}
+          {% set current = state_attr('climate.thermostat', 'target_humidity') %}
+          {% set fallback = state_attr('climate.thermostat', 'humidity') %}
+          {{ (current | float(target)) | round(0) == (target | round(0)) or
+             (fallback | float(target)) | round(0) == (target | round(0)) }}
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ wait.completed }}"
+            sequence: []
+        default:
+          - service: logbook.log
+            data:
+              name: Override Reset Warning
+              message: Thermostat humidity target did not confirm within 30 seconds
+              entity_id: climate.thermostat
+          - service: notify.notify
+            data:
+              title: "Reset Overrides Verification"
+              message: "Thermostat failed to confirm humidity target within 30 seconds while resetting overrides."
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ states('switch.dehumidifier_relay_l1') != 'unavailable' }}"
+            sequence:
+              - service: switch.turn_on
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+        default: []
+      - service: notify.mobile_app_drews_iphone
+        data:
+          title: "✅ All Overrides Reset"
+          message: >-
+            Emergency overrides cleared - Normal climate operation restored |
+            Temp: {{ states('input_number.climate_occupied_cooling_high') }}°F |
+            Humidity: {{ states('input_number.climate_occupied_humidity_max') }}%
+          data:
+            priority: normal
+
+  reset_climate_controls_to_defaults:
+    alias: "Reset Climate Controls to Defaults"
+    icon: mdi:restore
+    sequence:
+      # Temperature defaults
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.foundation_cooling_target_home
+        data:
+          value: 74.0
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.foundation_cooling_target_sleep
+        data:
+          value: 73.0
+
+      # Humidity defaults
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.foundation_humidity_max_home
+        data:
+          value: 55
+
+      # Dew point defaults
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.climate_dew_point_limit
+        data:
+          value: 55
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.climate_dew_point_emergency
+        data:
+          value: 57
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.climate_dew_point_lockout
+        data:
+          value: 60
+
+      # Notification
+      - service: notify.mobile_app_drews_iphone
+        data:
+          title: "Climate Controls Reset"
+          message: "All climate control values restored to factory defaults: Home 74°F, Sleep 73°F, Humidity 55%, Dew Point Limits 55/57/60°F"
+          data:
+            push:
+              sound: default
+
+timer:
+  hvac_manual_override_timer:
+    name: HVAC Manual Override Timer
+    duration: "00:45:00"
+  hvac_runtime_monitor:
+    name: HVAC Runtime Monitor
+    duration: "00:45:00"
+  hvac_cooldown_timer:
+    name: HVAC Cooldown Timer
+    duration: "00:10:00"
+  dehumidifier_runtime_monitor:
+    name: Dehumidifier Runtime Monitor
+    duration: "01:30:00"
+  dehumidifier_cooldown_timer:
+    name: Dehumidifier Cooldown Timer
+    duration: "00:10:00"
+  emergency_lockout_timer:
+    name: Emergency Lockout Timer
+    duration: "01:00:00"
+
+counter:
+  equipment_arbitration_emergencies:
+    name: Equipment Arbitration Emergency Events
+    icon: mdi:alert-circle
+    initial: 0
+
+automation:
+  - id: climate_track_hvac_cycle_times
+    alias: Climate Track HVAC Cycle Times
+    description: Update helper timestamps when the thermostat starts or stops cooling.
+    trigger:
+      - platform: state
+        entity_id: climate.thermostat
+        attribute: hvac_action
+    condition: []
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.to_state.attributes.get('hvac_action', '') == 'cooling' }}"
+            sequence:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.hvac_last_cool_start
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              # Start runtime monitor when cooling begins
+              - service: timer.start
+                target:
+                  entity_id: timer.hvac_runtime_monitor
+              # Cancel cooldown timer when cooling starts
+              - service: timer.cancel
+                target:
+                  entity_id: timer.hvac_cooldown_timer
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.to_state.attributes.get('hvac_action', '') in ['idle', 'fan', 'off'] }}"
+            sequence:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.hvac_last_cool_stop
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              # Stop runtime monitor and start cooldown when cooling stops
+              - service: timer.cancel
+                target:
+                  entity_id: timer.hvac_runtime_monitor
+              - service: timer.start
+                target:
+                  entity_id: timer.hvac_cooldown_timer
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.to_state.attributes.get('hvac_action', '') == 'cooling' }}"
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.hvac_emergency_override
+    mode: queued
+
+  - id: climate_track_dehumidifier_cycle_times
+    alias: Climate Track Dehumidifier Cycle Times
+    description: Maintain runtime metadata for the Aprilaire and enforce rest windows.
+    trigger:
+      - platform: state
+        entity_id: switch.dehumidifier_relay_l1
+    condition: []
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'on'
+            sequence:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.dehumidifier_last_start
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              # Start runtime monitor when dehumidifier turns on
+              - service: timer.start
+                target:
+                  entity_id: timer.dehumidifier_runtime_monitor
+              # Cancel cooldown timer when dehumidifier starts
+              - service: timer.cancel
+                target:
+                  entity_id: timer.dehumidifier_cooldown_timer
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'off'
+            sequence:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.dehumidifier_last_stop
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              # Stop runtime monitor and start cooldown when dehumidifier stops
+              - service: timer.cancel
+                target:
+                  entity_id: timer.dehumidifier_runtime_monitor
+              - service: timer.start
+                target:
+                  entity_id: timer.dehumidifier_cooldown_timer
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'on'
+            sequence:
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.thermostat_previous_fan_mode
+                data:
+                  value: "{{ state_attr('climate.thermostat', 'fan_mode') | default('auto') }}"
+              - service: climate.set_fan_mode
+                target:
+                  entity_id: climate.thermostat
+                data:
+                  fan_mode: on
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'off'
+            sequence:
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ is_state('input_text.thermostat_previous_fan_mode', 'on') }}"
+                    sequence:
+                      - service: climate.set_fan_mode
+                        target:
+                          entity_id: climate.thermostat
+                        data:
+                          fan_mode: on
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ is_state('input_text.thermostat_previous_fan_mode', 'circulate') }}"
+                    sequence:
+                      - service: climate.set_fan_mode
+                        target:
+                          entity_id: climate.thermostat
+                        data:
+                          fan_mode: circulate
+                default:
+                  - service: climate.set_fan_mode
+                    target:
+                      entity_id: climate.thermostat
+                    data:
+                      fan_mode: auto
+    mode: queued
+
+  - id: climate_hvac_runtime_guard
+    alias: Climate HVAC Runtime Guard
+    description: Enforce the cooling runtime cap and schedule a rest window when exceeded.
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.hvac_runtime_exceeded
+        to: 'on'
+      - platform: time_pattern
+        minutes: "/5"
+    condition:
+      - condition: state
+        entity_id: input_boolean.climate_automation_pause
+        state: 'off'
+      - condition: state
+        entity_id: input_boolean.hvac_emergency_override
+        state: 'off'
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ state_attr('climate.thermostat', 'hvac_action') == 'cooling' }}"
+              - condition: template
+                value_template: >-
+                  {% set last_start = states('input_datetime.hvac_last_cool_start') %}
+                  {% if last_start in ['unknown', 'unavailable', ''] %}
+                    false
+                  {% else %}
+                    {% set elapsed = (as_timestamp(now()) - as_timestamp(last_start)) / 60 %}
+                    {% set cap = states('input_number.climate_hvac_runtime_cap') | float(45) %}
+                    {{ elapsed >= cap }}
+                  {% endif %}
+            sequence:
+              - service: climate.turn_off
+                target:
+                  entity_id: climate.thermostat
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.hvac_last_cool_stop
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              - service: notify.notify
+                data:
+                  title: "HVAC Runtime Guard"
+                  message: >-
+                    Cooling runtime exceeded
+                    {{ states('input_number.climate_hvac_runtime_cap') | int }} minutes.
+                    Thermostat turned off to protect the compressor and honor the
+                    {{ states('input_number.climate_hvac_rest_window') | int }} minute rest window.
+        default: []
+    mode: single
+
+  - id: climate_dehumidifier_runtime_guard
+    alias: Climate Dehumidifier Runtime Guard
+    description: Enforce maximum continuous runtime for the Aprilaire and surface alerts when exceeded.
+    trigger:
+      - platform: state
+        entity_id: switch.dehumidifier_relay_l1
+        to: 'on'
+      - platform: time_pattern
+        minutes: "/5"
+    condition: []
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: switch.dehumidifier_relay_l1
+                state: 'on'
+              - condition: template
+                value_template: >-
+                  {% set last_start = states('input_datetime.dehumidifier_last_start') %}
+                  {% set cap = states('input_number.climate_dehumidifier_runtime_cap') | float(90) %}
+                  {% if last_start in ['unknown', 'unavailable', ''] %}
+                    false
+                  {% else %}
+                    {{ (as_timestamp(now()) - as_timestamp(last_start)) / 60 >= cap }}
+                  {% endif %}
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.dehumidifier_runtime_lockout_active
+              - repeat:
+                  count: 3
+                  sequence:
+                    - service: switch.turn_off
+                      target:
+                        entity_id: switch.dehumidifier_relay_l1
+                    - delay:
+                        seconds: 2
+              - service: homeassistant.update_entity
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+              - wait_template: "{{ is_state('switch.dehumidifier_relay_l1', 'off') }}"
+                timeout: "00:01:00"
+                continue_on_timeout: true
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.dehumidifier_last_stop
+                data:
+                  datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ wait.completed }}"
+                    sequence:
+                      - service: notify.notify
+                        data:
+                          title: "Dehumidifier Runtime Guard"
+                          message: >-
+                            Aprilaire runtime exceeded
+                            {{ states('input_number.climate_dehumidifier_runtime_cap') | int }} minutes.
+                            Relay reports OFF; enforcing a
+                            {{ states('input_number.climate_dehumidifier_rest_window') | int }} minute
+                            rest window before restoring automation control.
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ not wait.completed }}"
+                    sequence:
+                      - service: notify.notify
+                        data:
+                          title: "Dehumidifier Runtime Guard"
+                          message: >-
+                            Aprilaire runtime exceeded
+                            {{ states('input_number.climate_dehumidifier_runtime_cap') | int }} minutes,
+                            but the relay still reports ON after multiple shutdown attempts.
+                            Check Zigbee2MQTT connectivity or power the Aprilaire down manually;
+                            the rest window remains in effect once connectivity returns.
+              - service: script.reset_all_overrides
+        default: []
+    mode: single
+
+  - id: climate_release_dehumidifier_runtime_guard
+    alias: Climate Release Dehumidifier Runtime Guard
+    description: Clear the runtime lockout once the rest window expires.
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dehumidifier_rest_window_active
+        to: 'off'
+    condition:
+      - condition: state
+        entity_id: input_boolean.dehumidifier_runtime_lockout_active
+        state: 'on'
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.dehumidifier_runtime_lockout_active
+      - service: notify.notify
+        data:
+          title: "Dehumidifier Runtime Guard"
+          message: Rest window satisfied; automated dehumidifier control has resumed.
+    mode: single
+
+  - id: dehumidifier_outlet_keeper
+    alias: "Dehumidifier Outlet Keeper"
+    description: "Ensure smart outlet is ON when relay is active or when outlet is turned off"
+    trigger:
+      - platform: state
+        entity_id: switch.dehumidifier_relay_l1
+        to: 'on'
+        id: relay_on
+      - platform: state
+        entity_id: switch.dehumidifier_outlet_switch
+        to: 'off'
+        for:
+          seconds: 10
+        id: outlet_off
+    condition:
+      - condition: state
+        entity_id: switch.dehumidifier_relay_l1
+        state: 'on'
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.dehumidifier_outlet_switch
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: outlet_off
+            sequence:
+              - service: notify.notify
+                data:
+                  title: "🔌 Dehumidifier Outlet Auto-Recovery"
+                  message: >-
+                    Smart outlet was OFF while relay was active.
+                    Automatically turned outlet back ON to restore power.
+                    Relay has been signaling ON but E130 had no power for 10+ seconds.
+        default: []
+    mode: single
+
+  - id: climate_override_rest_release
+    alias: Climate Override Rest Release
+    description: Allow manual overrides to bypass equipment rest windows immediately.
+    trigger:
+      - platform: state
+        entity_id:
+          - input_boolean.manual_humidity_emergency_override
+          - input_boolean.hvac_emergency_override
+        to: 'on'
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.entity_id == 'input_boolean.manual_humidity_emergency_override' }}"
+              - condition: state
+                entity_id: input_boolean.dehumidifier_runtime_lockout_active
+                state: 'off'
+            sequence:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.dehumidifier_last_stop
+                data:
+                  datetime: "{{ (now() - timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S') }}"
+              - service: timer.start
+                target:
+                  entity_id: timer.hvac_manual_override_timer
+                data:
+                  duration: "01:00:00"
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.entity_id == 'input_boolean.hvac_emergency_override' }}"
+            sequence:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.hvac_last_cool_stop
+                data:
+                  datetime: "{{ (now() - timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S') }}"
+
+  - id: climate_manual_override_timer_guard
+    alias: Climate Manual Override Timer Guard
+    description: Ensure the manual override timer refreshes whenever the emergency toggle is used.
+    trigger:
+      - platform: state
+        entity_id: input_boolean.manual_humidity_emergency_override
+        to: 'on'
+    action:
+      - service: timer.start
+        target:
+          entity_id: timer.hvac_manual_override_timer
+        data:
+          duration: "01:00:00"
+
+  - id: climate_comfort_setpoint_manager
+    alias: Climate Comfort Setpoint Manager
+    description: Bias thermostat setpoints toward the 72°–76°F occupied comfort band.
+    trigger:
+      - platform: time_pattern
+        minutes: "/5"
+      - platform: state
+        entity_id: binary_sensor.climate_any_room_occupied
+        for: "00:02:00"
+      - platform: state
+        entity_id: sensor.average_house_temperature_combined
+        for: "00:02:00"
+      - platform: state
+        entity_id: sensor.priority_dew_point_enhanced
+        for: "00:02:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.climate_automation_pause
+        state: 'off'
+      - condition: state
+        entity_id: input_boolean.hvac_emergency_override
+        state: 'off'
+    action:
+      - variables:
+          low: "{{ states('input_number.climate_occupied_cooling_low') | float(72) }}"
+          high: "{{ states('input_number.climate_occupied_cooling_high') | float(76) }}"
+          vacant: "{{ states('input_number.climate_unoccupied_cooling_target') | float(78) }}"
+          current_mode: "{{ states('climate.thermostat') }}"
+          target_temp: "{{ ((low | float) + (high | float)) / 2 }}"
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.climate_any_room_occupied
+                state: 'on'
+            sequence:
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ current_mode == 'cool' }}"
+                    sequence:
+                      - service: climate.set_temperature
+                        target:
+                          entity_id: climate.thermostat
+                        data:
+                          temperature: "{{ target_temp }}"
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.climate_any_room_occupied
+                state: 'off'
+            sequence:
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ current_mode == 'cool' }}"
+                    sequence:
+                      - service: climate.set_temperature
+                        target:
+                          entity_id: climate.thermostat
+                        data:
+                          temperature: "{{ vacant | float }}"
+    mode: queued
+
+  - id: climate_dew_point_dehumidifier_control
+    alias: Climate Dew Point Dehumidifier Control
+    description: Stage dehumidifier runtime against dew point guardrails with rest protection.
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.max_indoor_dew_point_enhanced
+        above: 54
+      - platform: numeric_state
+        entity_id: sensor.max_indoor_dew_point_enhanced
+        below: 53
+      - platform: state
+        entity_id: binary_sensor.humidity_emergency_condition
+      - platform: state
+        entity_id: binary_sensor.humidity_lockout_condition
+      - platform: state
+        entity_id: input_boolean.manual_humidity_emergency_override
+      - platform: time_pattern
+        minutes: "/5"
+    condition:
+      - condition: state
+        entity_id: input_boolean.climate_automation_pause
+        state: 'off'
+      - condition: state
+        entity_id: input_boolean.dehumidifier_service_mode
+        state: 'off'
+    action:
+      - variables:
+          max_dew_point: "{{ states('sensor.max_indoor_dew_point_enhanced') | float(0) }}"
+          priority_dew_point: "{{ states('sensor.priority_dew_point_enhanced') | float(0) }}"
+          limit: "{{ states('input_number.climate_dew_point_limit') | float(55) }}"
+          emergency: "{{ states('input_number.climate_dew_point_emergency') | float(57) }}"
+          lockout: "{{ states('input_number.climate_dew_point_lockout') | float(60) }}"
+          manual_override_active: "{{ is_state('input_boolean.manual_humidity_emergency_override', 'on') }}"
+          hvac_active: "{{ state_attr('climate.thermostat', 'hvac_action') == 'cooling' }}"
+          runtime_lockout_active: "{{ is_state('input_boolean.dehumidifier_runtime_lockout_active', 'on') }}"
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ manual_override_active and not runtime_lockout_active }}"
+            sequence:
+              - service: switch.turn_on
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+          - conditions:
+              - condition: template
+                value_template: >-
+                  {{ max_dew_point >= lockout or
+                     is_state('binary_sensor.humidity_lockout_condition', 'on') }}
+              - condition: state
+                entity_id: binary_sensor.dehumidifier_rest_window_active
+                state: 'off'
+              - condition: state
+                entity_id: binary_sensor.dehumidifier_minimum_run_satisfied
+                state: 'on'
+              - condition: state
+                entity_id: input_boolean.dehumidifier_runtime_lockout_active
+                state: 'off'
+            sequence:
+              - service: switch.turn_on
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+          - conditions:
+              - condition: template
+                value_template: >-
+                  {{ (priority_dew_point >= limit and not hvac_active)
+                     or (max_dew_point >= emergency) }}
+              - condition: state
+                entity_id: binary_sensor.dehumidifier_rest_window_active
+                state: 'off'
+              - condition: state
+                entity_id: input_boolean.dehumidifier_runtime_lockout_active
+                state: 'off'
+            sequence:
+              - service: switch.turn_on
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+          - conditions:
+              - condition: template
+                value_template: "{{ priority_dew_point <= (limit - 1) }}"
+              - condition: state
+                entity_id: input_boolean.manual_humidity_emergency_override
+                state: 'off'
+              - condition: state
+                entity_id: binary_sensor.dehumidifier_minimum_run_satisfied
+                state: 'on'
+            sequence:
+              - service: switch.turn_off
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+        default:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ hvac_active and max_dew_point < emergency and not manual_override_active }}"
+                sequence:
+                  - condition: state
+                    entity_id: switch.dehumidifier_relay_l1
+                    state: 'on'
+                  - condition: state
+                    entity_id: binary_sensor.dehumidifier_minimum_run_satisfied
+                    state: 'on'
+                  - service: switch.turn_off
+                    target:
+                      entity_id: switch.dehumidifier_relay_l1
+    mode: queued
+
+  - id: climate_humidity_emergency_coordination
+    alias: Climate Humidity Emergency Coordination
+    description: Permit dual HVAC and dehumidifier operation during dew point emergencies and notify when resolved.
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.humidity_emergency_condition
+      - platform: state
+        entity_id: binary_sensor.humidity_lockout_condition
+    condition: []
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.humidity_emergency_condition
+                state: 'on'
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.hvac_emergency_override
+              - service: climate.set_hvac_mode
+                target:
+                  entity_id: climate.thermostat
+                data:
+                  hvac_mode: cool
+              - service: climate.set_temperature
+                target:
+                  entity_id: climate.thermostat
+                data:
+                  temperature: "{{ (states('input_number.climate_occupied_cooling_low') | float(72)) }}"
+              - service: switch.turn_on
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+              - service: notify.notify
+                data:
+                  title: "Humidity Emergency"
+                  message: >-
+                    Dew point spiked to {{ states('sensor.max_indoor_dew_point_enhanced') }}°F.
+                    Dual HVAC + Aprilaire runtime authorized until conditions normalize.
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.humidity_emergency_condition
+                state: 'off'
+                for:
+                  minutes: 5
+            sequence:
+              - condition: state
+                entity_id: input_boolean.manual_humidity_emergency_override
+                state: 'off'
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.hvac_emergency_override
+              - service: notify.notify
+                data:
+                  title: "Humidity Emergency Cleared"
+                  message: >-
+                    Dew point recovered to {{ states('sensor.max_indoor_dew_point_enhanced') }}°F.
+                    Reverting to staged control.
+    mode: queued
+
+  - id: climate_dehumidifier_service_mode_protection
+    alias: Climate Dehumidifier Service Mode Protection
+    description: Automatically pause automation commands while servicing the Aprilaire.
+    trigger:
+      - platform: state
+        entity_id: input_boolean.dehumidifier_service_mode
+    condition: []
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.dehumidifier_service_mode
+                state: 'on'
+            sequence:
+              - service: switch.turn_off
+                target:
+                  entity_id: switch.dehumidifier_relay_l1
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.climate_automation_pause
+          - conditions:
+              - condition: state
+                entity_id: input_boolean.dehumidifier_service_mode
+                state: 'off'
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.climate_automation_pause
+    mode: restart
+
+  - id: climate_manual_override_timer_complete
+    alias: Climate Manual Override Timer Complete
+    description: Clear manual override flags when the guard timer expires.
+    trigger:
+      - platform: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.hvac_manual_override_timer
+    condition: []
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.manual_humidity_emergency_override
+            - input_boolean.hvac_emergency_override
+      - service: notify.notify
+        data:
+          title: "Manual Override Window Closed"
+          message: Automatic climate orchestration restored after override timer completion.
+    mode: restart
+
+  - id: climate_automation_pause_guardrail
+    alias: Climate Automation Pause Guardrail
+    description: Notify homeowners if automations remain paused for more than one hour.
+    trigger:
+      - platform: state
+        entity_id: input_boolean.climate_automation_pause
+        to: 'on'
+        for:
+          hours: 1
+    condition: []
+    action:
+      - service: notify.notify
+        data:
+          title: "Climate Automations Paused"
+          message: >-
+            Pause switch has been active for over an hour.
+            Review manual settings or reset automations when ready.
+    mode: single
+
+  - id: climate_hvac_cooldown_release
+    alias: Climate HVAC Cooldown Release
+    description: Prevent automation-driven cooldown releases before minimum runtime.
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.average_house_dew_point_enhanced
+        below: 54
+      - platform: numeric_state
+        entity_id: sensor.average_house_temperature_combined
+        below: 73
+    condition:
+      - condition: state
+        entity_id: climate.thermostat
+        state: cool
+      - condition: state
+        entity_id: binary_sensor.hvac_minimum_run_satisfied
+        state: 'on'
+    action:
+      - condition: state
+        entity_id: input_boolean.hvac_emergency_override
+        state: 'off'
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.thermostat
+        data:
+          temperature: "{{ states('input_number.climate_occupied_cooling_high') | float(76) }}"
+    mode: queued
+
+  - id: track_equipment_arbitration_emergencies
+    alias: "Track Equipment Arbitration Emergencies"
+    description: "Increment counter and log when emergency coordination activates"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.humidity_emergency_condition
+        to: 'on'
+      - platform: state
+        entity_id: input_boolean.hvac_emergency_override
+        to: 'on'
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != trigger.from_state.state }}"
+    action:
+      - service: counter.increment
+        target:
+          entity_id: counter.equipment_arbitration_emergencies
+      - service: logbook.log
+        data:
+          name: "Equipment Arbitration Emergency"
+          message: >
+            Emergency #{{ states('counter.equipment_arbitration_emergencies') }} -
+            Dew point: {{ states('sensor.max_indoor_dew_point_enhanced') }}°F
+          entity_id: binary_sensor.equipment_arbitration_emergency_active
+    mode: single
+
+  - id: reset_equipment_arbitration_emergencies
+    alias: "Reset Equipment Arbitration Emergency Counter"
+    description: "Auto-reset counter when all emergency conditions clear"
+    trigger:
+      - platform: state
+        entity_id:
+          - binary_sensor.humidity_emergency_condition
+          - binary_sensor.humidity_emergency_condition_2
+          - input_boolean.hvac_emergency_override
+          - input_boolean.manual_humidity_emergency_override
+        to: 'off'
+        for:
+          minutes: 5
+    condition:
+      - condition: and
+        conditions:
+          - condition: state
+            entity_id: binary_sensor.humidity_emergency_condition
+            state: 'off'
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: binary_sensor.humidity_emergency_condition_2
+                state: 'off'
+              - condition: state
+                entity_id: binary_sensor.humidity_emergency_condition_2
+                state: 'unavailable'
+          - condition: state
+            entity_id: input_boolean.hvac_emergency_override
+            state: 'off'
+          - condition: state
+            entity_id: input_boolean.manual_humidity_emergency_override
+            state: 'off'
+          - condition: numeric_state
+            entity: counter.equipment_arbitration_emergencies
+            above: 0
+    action:
+      - service: counter.reset
+        target:
+          entity_id: counter.equipment_arbitration_emergencies
+      - service: logbook.log
+        data:
+          name: "Equipment Arbitration System"
+          message: "Emergency counter auto-reset - All conflicts resolved"
+          entity_id: counter.equipment_arbitration_emergencies
+    mode: single

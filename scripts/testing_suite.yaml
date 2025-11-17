@@ -1,0 +1,11 @@
+# Home Assistant Test Suite for Climate System
+
+# This file will contain scripts to simulate failure conditions and validate system responses.
+# These scripts will be developed during Phase 0.
+
+placeholder_test_script:
+  alias: "Placeholder for Test Suite"
+  sequence:
+    - service: system_log.write
+      data:
+        message: "Test suite scripts will be defined here."

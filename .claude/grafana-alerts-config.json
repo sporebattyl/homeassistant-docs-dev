@@ -1,0 +1,327 @@
+{
+  "alerts": [
+    {
+      "id": 1,
+      "name": "High Temperature Alert",
+      "message": "Temperature in {{$labels.room}} is critically high: {{$value}}°F",
+      "frequency": "10s",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb",
+            "refId": "A",
+            "rawSql": "SELECT mean(value) FROM temperature WHERE room IN ('living_room', 'kitchen', 'master_bedroom', 'office') AND time >= now() - 5m GROUP BY room"
+          },
+          "reducer": {
+            "type": "last",
+            "params": []
+          },
+          "evaluator": {
+            "params": [80],
+            "type": "gt"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "2m",
+      "annotations": {
+        "description": "Temperature sensor shows critically high reading",
+        "runbook_url": "https://homeassistant.local:8123/config/automation",
+        "summary": "High temperature detected in {{$labels.room}}"
+      },
+      "labels": {
+        "severity": "critical",
+        "team": "climate"
+      }
+    },
+    {
+      "id": 2,
+      "name": "HVAC System Malfunction",
+      "message": "HVAC system performance score below threshold: {{$value}}%",
+      "frequency": "30s",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb", 
+            "refId": "A",
+            "rawSql": "SELECT mean(value) FROM climate_system_performance_score WHERE time >= now() - 10m"
+          },
+          "reducer": {
+            "type": "last",
+            "params": []
+          },
+          "evaluator": {
+            "params": [30],
+            "type": "lt"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "5m",
+      "annotations": {
+        "description": "HVAC system performance score indicates potential malfunction",
+        "runbook_url": "https://homeassistant.local:8123/config/automation",
+        "summary": "HVAC performance degraded to {{$value}}%"
+      },
+      "labels": {
+        "severity": "warning",
+        "team": "climate"
+      }
+    },
+    {
+      "id": 3,
+      "name": "High Energy Consumption",
+      "message": "Climate system energy usage is unusually high: {{$value}} kWh",
+      "frequency": "1m",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb",
+            "refId": "A", 
+            "rawSql": "SELECT mean(value) FROM climate_system_energy_usage WHERE time >= now() - 15m"
+          },
+          "reducer": {
+            "type": "last",
+            "params": []
+          },
+          "evaluator": {
+            "params": [5],
+            "type": "gt"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "10m",
+      "annotations": {
+        "description": "Climate system consuming more energy than expected threshold",
+        "runbook_url": "https://homeassistant.local:8123/config/automation",
+        "summary": "High energy usage detected: {{$value}} kWh"
+      },
+      "labels": {
+        "severity": "warning",
+        "team": "energy"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Equipment Overheating",
+      "message": "Equipment temperature critically high: {{$labels.device}} at {{$value}}°F",
+      "frequency": "30s",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb",
+            "refId": "A",
+            "rawSql": "SELECT mean(value) FROM device_temperature WHERE device IN ('dehumidifier_relay', 'motion_sensor_office', 'water_heater_area') AND time >= now() - 5m GROUP BY device"
+          },
+          "reducer": {
+            "type": "last",
+            "params": []
+          },
+          "evaluator": {
+            "params": [115],
+            "type": "gt"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "2m",
+      "annotations": {
+        "description": "Equipment temperature sensor reading is dangerously high",
+        "runbook_url": "https://homeassistant.local:8123/config/automation",
+        "summary": "Equipment overheating: {{$labels.device}} at {{$value}}°F"
+      },
+      "labels": {
+        "severity": "critical",
+        "team": "maintenance"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Humidity Out of Range",
+      "message": "House humidity level out of optimal range: {{$value}}%",
+      "frequency": "2m",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb",
+            "refId": "A",
+            "rawSql": "SELECT mean(value) FROM house_humidity WHERE time >= now() - 10m"
+          },
+          "reducer": {
+            "type": "last", 
+            "params": []
+          },
+          "evaluator": {
+            "params": [35, 60],
+            "type": "outside_range"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "15m",
+      "annotations": {
+        "description": "House humidity level is outside the optimal 35-60% range",
+        "runbook_url": "https://homeassistant.local:8123/config/automation",
+        "summary": "Humidity out of range: {{$value}}%"
+      },
+      "labels": {
+        "severity": "warning",
+        "team": "climate"
+      }
+    },
+    {
+      "id": 6,
+      "name": "System Uptime Degraded",
+      "message": "Home Assistant system uptime below 100%: {{$value}}%",
+      "frequency": "5m",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb",
+            "refId": "A",
+            "rawSql": "SELECT mean(value) FROM system_uptime_percentage WHERE time >= now() - 30m"
+          },
+          "reducer": {
+            "type": "last",
+            "params": []
+          },
+          "evaluator": {
+            "params": [98],
+            "type": "lt"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "10m",
+      "annotations": {
+        "description": "Home Assistant system uptime has degraded below expected levels",
+        "runbook_url": "https://homeassistant.local:8123/config/automation",
+        "summary": "System uptime degraded: {{$value}}%"
+      },
+      "labels": {
+        "severity": "warning",
+        "team": "system"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Maintenance Score Low",
+      "message": "Climate system maintenance score critically low: {{$value}}%",
+      "frequency": "1h",
+      "conditions": [
+        {
+          "query": {
+            "queryType": "influxdb",
+            "refId": "A",
+            "rawSql": "SELECT mean(value) FROM climate_system_maintenance_score WHERE time >= now() - 1h"
+          },
+          "reducer": {
+            "type": "last",
+            "params": []
+          },
+          "evaluator": {
+            "params": [50],
+            "type": "lt"
+          }
+        }
+      ],
+      "executionErrorState": "alerting",
+      "noDataState": "no_data",
+      "for": "30m",
+      "annotations": {
+        "description": "Climate system maintenance score indicates immediate attention required",
+        "runbook_url": "https://homeassistant.local:8123/config/automation", 
+        "summary": "Maintenance required: Score {{$value}}%"
+      },
+      "labels": {
+        "severity": "critical",
+        "team": "maintenance"
+      }
+    }
+  ],
+  "notification_channels": [
+    {
+      "id": 1,
+      "name": "home-assistant-notify",
+      "type": "webhook",
+      "settings": {
+        "url": "http://192.168.88.125:8123/api/services/notify/notify",
+        "method": "POST",
+        "headers": {
+          "Authorization": "Bearer your-home-assistant-long-lived-token",
+          "Content-Type": "application/json"
+        },
+        "bodyTemplate": {
+          "message": "HASSBOT Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}",
+          "title": "{{ .GroupLabels.alertname }}",
+          "data": {
+            "priority": "high",
+            "tag": "hassbot",
+            "color": "red"
+          }
+        }
+      },
+      "sendReminder": true,
+      "frequency": "4h",
+      "disableResolveMessage": false
+    },
+    {
+      "id": 2,
+      "name": "email-alerts",
+      "type": "email",
+      "settings": {
+        "addresses": ["admin@yourhome.com"],
+        "subject": "HASSBOT System Alert: {{ .GroupLabels.alertname }}",
+        "body": "Alert Details:\n{{ range .Alerts }}\n- {{ .Annotations.summary }}\n  Description: {{ .Annotations.description }}\n  Severity: {{ .Labels.severity }}\n  Time: {{ .StartsAt }}\n{{ end }}"
+      },
+      "sendReminder": true,
+      "frequency": "12h",
+      "disableResolveMessage": false
+    }
+  ],
+  "alert_rules": [
+    {
+      "alert": "HighTemperatureAlert",
+      "expr": "max(aqaratemphumid1_temperature, aqaratemphumid2_temperature, aqaratemphumid3_temperature, aqaratemphumid4_temperature, aqaratemphumid7_temperature, aqaratemphumid9_temperature) > 80",
+      "for": "2m",
+      "labels": {
+        "severity": "critical"
+      },
+      "annotations": {
+        "summary": "High temperature detected",
+        "description": "At least one room temperature sensor is reading above 80°F"
+      }
+    },
+    {
+      "alert": "HVACPerformanceDegraded",
+      "expr": "climate_system_performance_score < 30",
+      "for": "5m", 
+      "labels": {
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "HVAC performance degraded",
+        "description": "HVAC system performance score has dropped below acceptable threshold"
+      }
+    },
+    {
+      "alert": "HighEnergyConsumption",
+      "expr": "climate_system_energy_usage > 5",
+      "for": "10m",
+      "labels": {
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "High energy consumption",
+        "description": "Climate system is consuming more than 5 kWh"
+      }
+    }
+  ]
+}

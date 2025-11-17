@@ -1,0 +1,1135 @@
+# =============================================================================
+# CLIMATE.ENERGY.MANAGEMENT.YAML - Unified Energy Management System
+# =============================================================================
+# Package #7/8: KISS Climate Optimization Phase 4 - Energy Consolidation
+#
+# CONSOLIDATION: 4 packages → 1 unified system (4→1 reduction)
+# - climate_energy_coordination_integration.yaml (21KB) ✅ INTEGRATED
+# - climate_energy_monitoring_expandable.yaml (36KB) ✅ INTEGRATED
+# - climate_energy_phase3_baseline_tracking.yaml (23KB) ✅ INTEGRATED
+# - climate_energy_tracking.yaml (18KB) ✅ INTEGRATED
+#
+# ENERGY OBJECTIVES:
+# - Continue $548/year savings progress toward $520-960/year target
+# - Gulf Coast flat rate billing optimization (18¢/kWh)
+# - ML14XC1/E130 coordination with 15-sensor integration
+# - Real sensor integration with smart plug/Vue 3 preparation
+# - Equipment protection and safety compliance
+#
+# FEATURE HIERARCHY:
+# ├── Energy Management Master (main toggle)
+# ├── Real-Time Monitoring (power tracking and sensors)
+# ├── Cost Optimization (flat rate billing optimization)
+# ├── Efficiency Analytics (performance tracking and reporting)
+# └── Future Hardware Integration (smart plugs, Vue 3 preparation)
+#
+# HOME ASSISTANT 2025.9.1 COMPLIANCE: All modern syntax with action: triggers
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# KISS DASHBOARD CONTROLS - 5 MAIN ENERGY TOGGLES
+# -----------------------------------------------------------------------------
+input_boolean:
+  # Master Energy Management Control
+  climate_energy_management_master:
+    name: "Energy Management Master"
+    initial: true
+    icon: mdi:lightning-bolt
+
+  # Real-Time Monitoring Toggle
+  climate_energy_real_time_monitoring:
+    name: "Real-Time Energy Monitoring"
+    initial: true
+    icon: mdi:chart-line
+
+  # Cost Optimization Toggle
+  climate_energy_cost_optimization:
+    name: "Energy Cost Optimization"
+    initial: true
+    icon: mdi:currency-usd
+
+  # Efficiency Analytics Toggle
+  climate_energy_efficiency_analytics:
+    name: "Energy Efficiency Analytics"
+    initial: true
+    icon: mdi:speedometer
+
+  # Future Hardware Integration Toggle
+  climate_energy_future_hardware:
+    name: "Future Hardware Integration"
+    initial: false
+    icon: mdi:home-lightning-bolt
+
+  # Legacy Feature Flags (preserved for migration)
+  enable_energy_monitoring_system:
+    name: "Enable Energy Monitoring System (Legacy)"
+    initial: true
+    icon: mdi:flash
+
+  enable_dehumidifier_real_energy:
+    name: "Enable Dehumidifier Real Energy Monitoring"
+    initial: false
+    icon: mdi:water-percent
+
+  enable_hvac_real_energy:
+    name: "Enable HVAC Real Energy Monitoring"
+    initial: false
+    icon: mdi:air-conditioner
+
+  enable_fan_real_energy:
+    name: "Enable Fan Real Energy Monitoring"
+    initial: false
+    icon: mdi:fan
+
+  enable_vue3_integration:
+    name: "Enable Emporia Vue 3 Integration"
+    initial: false
+    icon: mdi:home-lightning-bolt
+
+  enable_vue3_circuit_monitoring:
+    name: "Enable Vue 3 Individual Circuit Monitoring"
+    initial: false
+    icon: mdi:electric-switch
+
+  # Savings and Analytics Toggles
+  enable_phase3_baseline_tracking:
+    name: "Enable Phase 3 Baseline Energy Tracking"
+    initial: true
+    icon: mdi:chart-line-stacked
+
+  enable_phase3a_fan_coordination_tracking:
+    name: "Enable Phase 3A Fan Coordination Savings Tracking"
+    initial: true
+    icon: mdi:fan-chevron-up
+
+  enable_phase3b_humidity_coordination_tracking:
+    name: "Enable Phase 3B Enhanced Humidity Savings Tracking"
+    initial: true
+    icon: mdi:water-percent-alert
+
+  enable_energy_efficiency_analytics:
+    name: "Enable Energy Efficiency Analytics"
+    initial: true
+    icon: mdi:analytics
+
+  enable_cost_savings_validation:
+    name: "Enable Cost Savings Validation"
+    initial: true
+    icon: mdi:currency-usd
+
+  # Simple Tracking Toggles (from climate_energy_tracking.yaml)
+  energy_tracking_enabled:
+    name: "Energy Tracking Enabled"
+    initial: true
+    icon: mdi:chart-line
+
+  cost_monitoring_enabled:
+    name: "Cost Monitoring Enabled"
+    initial: true
+    icon: mdi:currency-usd
+
+  savings_estimation_enabled:
+    name: "Savings Estimation Enabled"
+    initial: true
+    icon: mdi:piggy-bank
+
+# -----------------------------------------------------------------------------
+# ENERGY THRESHOLDS AND COST SETTINGS
+# -----------------------------------------------------------------------------
+input_number:
+  # Gulf Coast Electricity Rate (18¢/kWh flat rate)
+  electricity_rate:
+    name: "Electricity Rate"
+    min: 5
+    max: 30
+    step: 0.1
+    initial: 18.0
+    unit_of_measurement: "¢/kWh"
+    icon: mdi:currency-usd
+    mode: box
+
+  # Monthly Climate Budget
+  monthly_climate_budget:
+    name: "Monthly Climate Budget"
+    min: 50
+    max: 400
+    step: 10
+    initial: 200
+    unit_of_measurement: "$"
+    icon: mdi:currency-usd
+    mode: slider
+
+  # HVAC Efficiency Target (ML14XC1 - 14 SEER)
+  efficiency_target:
+    name: "System Efficiency Target"
+    min: 10
+    max: 20
+    step: 0.5
+    initial: 14
+    unit_of_measurement: "SEER"
+    icon: mdi:leaf
+    mode: slider
+
+  # Energy Load Management Thresholds
+  energy_high_load_threshold:
+    name: "High Load Threshold"
+    min: 2000
+    max: 5000
+    step: 100
+    initial: 3000
+    unit_of_measurement: "W"
+    icon: mdi:flash-alert
+    mode: slider
+
+  energy_cost_alert_threshold:
+    name: "Daily Cost Alert Threshold"
+    min: 5
+    max: 20
+    step: 1
+    initial: 10
+    unit_of_measurement: "$"
+    icon: mdi:currency-usd
+    mode: slider
+
+# -----------------------------------------------------------------------------
+# ENERGY SENSORS - UNIFIED MONITORING AND ANALYTICS
+# -----------------------------------------------------------------------------
+template:
+  - sensor:
+      # ==========================================================================
+      # REAL-TIME ENERGY MONITORING - HYBRID INTELLIGENCE FRAMEWORK
+      # ==========================================================================
+
+      # DEHUMIDIFIER POWER - HYBRID WITH SMART PLUG/VUE 3 SUPPORT
+      - name: "Dehumidifier Power (Hybrid)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {% set feature_enabled = is_state('input_boolean.enable_dehumidifier_real_energy', 'on') %}
+
+          {% if not master_enabled or not monitoring_enabled %}
+            0
+          {% elif feature_enabled %}
+            {% if states('sensor.dehumidifier_outlet_switch_power') not in ['unknown', 'unavailable', 'none'] %}
+              {{ states('sensor.dehumidifier_outlet_switch_power') | float(0) }}
+            {% elif states('sensor.upstairs_dehumidifier_power') not in ['unknown', 'unavailable', 'none'] %}
+              {{ states('sensor.upstairs_dehumidifier_power') | float(0) }}
+            {% else %}
+              {{ states('sensor.climate_energy_dehumidifier_power_stub') | float(0) }}
+            {% endif %}
+          {% else %}
+            {{ states('sensor.climate_energy_dehumidifier_power_stub') | float(0) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {{ master_enabled and monitoring_enabled }}
+        attributes:
+          source: >
+            {% set feature_enabled = is_state('input_boolean.enable_dehumidifier_real_energy', 'on') %}
+            {% if feature_enabled %}
+              {% if states('sensor.dehumidifier_outlet_switch_power') not in ['unknown', 'unavailable', 'none'] %}
+                real_power_monitoring
+              {% elif states('sensor.upstairs_dehumidifier_power') not in ['unknown', 'unavailable', 'none'] %}
+                real_smart_plug
+              {% else %}
+                stub_fallback
+              {% endif %}
+            {% else %}
+              stub_primary
+            {% endif %}
+          validation_confidence: >
+            {% set feature_enabled = is_state('input_boolean.enable_dehumidifier_real_energy', 'on') %}
+            {% if feature_enabled %}
+              {% if states('sensor.dehumidifier_outlet_switch_power') not in ['unknown', 'unavailable', 'none'] %}
+                100
+              {% elif states('sensor.upstairs_dehumidifier_power') not in ['unknown', 'unavailable', 'none'] %}
+                95
+              {% else %}
+                60
+              {% endif %}
+            {% else %}
+              60
+            {% endif %}
+
+      # HVAC POWER - HYBRID WITH VUE 3 PREPARATION
+      - name: "HVAC Power (Hybrid)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {% set vue3_enabled = is_state('input_boolean.enable_vue3_integration', 'on') %}
+          {% set hvac_real_enabled = is_state('input_boolean.enable_hvac_real_energy', 'on') %}
+
+          {% if not master_enabled or not monitoring_enabled %}
+            0
+          {% elif vue3_enabled %}
+            {% if states('sensor.emporia_vue3_hvac_power') not in ['unknown', 'unavailable', 'none'] %}
+              {{ states('sensor.emporia_vue3_hvac_power') | float(0) }}
+            {% else %}
+              {{ states('sensor.climate_energy_hvac_power_stub') | float(0) }}
+            {% endif %}
+          {% elif hvac_real_enabled %}
+            {% if states('sensor.hvac_current_power') not in ['unknown', 'unavailable', 'none'] %}
+              {{ states('sensor.hvac_current_power') | float(0) }}
+            {% else %}
+              {{ states('sensor.climate_energy_hvac_power_stub') | float(0) }}
+            {% endif %}
+          {% else %}
+            {{ states('sensor.climate_energy_hvac_power_stub') | float(0) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {{ master_enabled and monitoring_enabled }}
+        attributes:
+          source: >
+            {% if is_state('input_boolean.enable_vue3_integration', 'on') %}
+              {% if states('sensor.emporia_vue3_hvac_power') not in ['unknown', 'unavailable', 'none'] %}
+                vue3_main
+              {% else %}
+                stub_fallback
+              {% endif %}
+            {% elif is_state('input_boolean.enable_hvac_real_energy', 'on') %}
+              {% if states('sensor.hvac_current_power') not in ['unknown', 'unavailable', 'none'] %}
+                real_direct
+              {% else %}
+                stub_fallback
+              {% endif %}
+            {% else %}
+              stub_primary
+            {% endif %}
+
+      # FANS POWER - HYBRID WITH SMART SWITCHES
+      - name: "Fans Power (Hybrid)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {% set vue3_circuit_enabled = is_state('input_boolean.enable_vue3_circuit_monitoring', 'on') %}
+          {% set fan_real_enabled = is_state('input_boolean.enable_fan_real_energy', 'on') %}
+
+          {% if not master_enabled or not monitoring_enabled %}
+            0
+          {% elif vue3_circuit_enabled %}
+            {% set fan1_power = states('sensor.emporia_vue3_living_room_fan_power') | float(0) %}
+            {% set fan2_power = states('sensor.emporia_vue3_office_fan_power') | float(0) %}
+            {% if fan1_power > 0 or fan2_power > 0 %}
+              {{ (fan1_power + fan2_power) | round(1) }}
+            {% else %}
+              {{ states('sensor.climate_energy_fans_power_stub') | float(0) }}
+            {% endif %}
+          {% elif fan_real_enabled %}
+            {% set fan1_power = states('sensor.living_room_fan_power') | float(0) %}
+            {% set fan2_power = states('sensor.office_fan_power') | float(0) %}
+            {% if fan1_power > 0 or fan2_power > 0 %}
+              {{ (fan1_power + fan2_power) | round(1) }}
+            {% else %}
+              {{ states('sensor.climate_energy_fans_power_stub') | float(0) }}
+            {% endif %}
+          {% else %}
+            {{ states('sensor.climate_energy_fans_power_stub') | float(0) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {{ master_enabled and monitoring_enabled }}
+
+      # TOTAL CLIMATE POWER - COMPREHENSIVE MONITORING
+      - name: "Total Climate Power (Hybrid)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+
+          {% if not master_enabled or not monitoring_enabled %}
+            0
+          {% else %}
+            {% set dehumidifier = states('sensor.climate_energy_dehumidifier_power_hybrid') | float(0) %}
+            {% set hvac = states('sensor.climate_energy_hvac_power_hybrid') | float(0) %}
+            {% set fans = states('sensor.climate_energy_fans_power_hybrid') | float(0) %}
+            {{ (dehumidifier + hvac + fans) | round(1) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set monitoring_enabled = is_state('input_boolean.climate_energy_real_time_monitoring', 'on') %}
+          {{ master_enabled and monitoring_enabled }}
+        attributes:
+          dehumidifier_watts: "{{ states('sensor.climate_energy_dehumidifier_power_hybrid') | float(0) }}"
+          hvac_watts: "{{ states('sensor.climate_energy_hvac_power_hybrid') | float(0) }}"
+          fans_watts: "{{ states('sensor.climate_energy_fans_power_hybrid') | float(0) }}"
+          sources_summary: >
+            Dehumidifier: {{
+              state_attr('sensor.climate_energy_dehumidifier_power_hybrid', 'source')
+              | default('unknown') }},
+            HVAC: {{
+              state_attr('sensor.climate_energy_hvac_power_hybrid', 'source')
+              | default('unknown') }},
+            Fans: {{
+              state_attr('sensor.climate_energy_fans_power_hybrid', 'source')
+              | default('unknown') }}
+
+      # ==========================================================================
+      # ENHANCED STUB SENSORS FOR FALLBACK (Gulf Coast Optimized)
+      # ==========================================================================
+
+      # DEHUMIDIFIER STUB - E130 PERFORMANCE MODEL
+      - name: "Dehumidifier Power (Stub)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% if is_state('switch.upstairs_dehumidifier', 'on') or is_state('switch.dehumidifier_relay_l1', 'on') %}
+            {% set humidity = state_attr('weather.forecast_home', 'humidity') | float(50) %}
+            {% if humidity > 70 %}
+              650
+            {% elif humidity > 60 %}
+              500
+            {% else %}
+              350
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+        availability: "{{ true }}"
+
+      # HVAC STUB - ML14XC1 PERFORMANCE MODEL
+      - name: "HVAC Power (Stub)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% if is_state('climate.thermostat', 'cool') %}
+            {% set outdoor_temp = state_attr('weather.forecast_home', 'temperature') | float(75) %}
+            {% set indoor_temp = state_attr('climate.thermostat', 'current_temperature') | float(72) %}
+            {% set target_temp = state_attr('climate.thermostat', 'temperature') | float(72) %}
+            {% set temp_diff = (outdoor_temp - target_temp) | abs %}
+            {% set load_factor = (temp_diff / 20) | float(0.5) %}
+            {{ (2500 * load_factor) | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+        availability: "{{ true }}"
+
+      # FANS STUB - CEILING FAN PERFORMANCE MODEL
+      - name: "Fans Power (Stub)"
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set fan1_speed = state_attr('fan.living_room_fan', 'percentage') | float(0) %}
+          {% set fan2_speed = state_attr('fan.office_fan', 'percentage') | float(0) %}
+          {% set fan1_watts = (fan1_speed / 100 * 75) | round(1) %}
+          {% set fan2_watts = (fan2_speed / 100 * 65) | round(1) %}
+          {{ (fan1_watts + fan2_watts) | round(1) }}
+        availability: "{{ true }}"
+
+      # ==========================================================================
+      # COST OPTIMIZATION AND TRACKING
+      # ==========================================================================
+
+      # ENERGY COST VALIDATION - CONTINUES $548/YEAR PROGRESS
+      - name: "Daily Energy Cost (Validation)"
+        unit_of_measurement: "$"
+        device_class: monetary
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set cost_enabled = is_state('input_boolean.climate_energy_cost_optimization', 'on') %}
+
+          {% if not master_enabled or not cost_enabled %}
+            0
+          {% else %}
+            {% set rate = states('input_number.electricity_rate') | float(18.0) / 100 %}
+            {% set daily_kwh = states('sensor.climate_total_energy_daily_meter_fixed') | float(2.1) %}
+            {{ (daily_kwh * rate) | round(2) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set cost_enabled = is_state('input_boolean.climate_energy_cost_optimization', 'on') %}
+          {{ master_enabled and cost_enabled }}
+        attributes:
+          rate_per_kwh: "{{ states('input_number.electricity_rate') }}¢"
+          daily_kwh: "{{ states('sensor.climate_total_energy_daily_meter_fixed') | float(2.1) }}"
+          monthly_projection: "{{ (states('sensor.energy_validation_total_daily_cost') | float(0) * 30) | round(0) }}"
+          annual_projection: "{{ (states('sensor.energy_validation_total_daily_cost') | float(0) * 365) | round(0) }}"
+          savings_progress: >
+            {% set current_annual = (states('sensor.energy_validation_total_daily_cost') | float(0) * 365) %}
+            {% set baseline_annual = 2000 %}  {# Estimated pre-optimization baseline #}
+            {% set savings = baseline_annual - current_annual %}
+            ${{ savings | round(0) }}/year progress toward $520-960 target
+
+      # GULF COAST FLAT RATE OPTIMIZATION
+      - name: "Gulf Coast Energy Efficiency Score"
+        unit_of_measurement: "%"
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set analytics_enabled = is_state('input_boolean.climate_energy_efficiency_analytics', 'on') %}
+
+          {% if not master_enabled or not analytics_enabled %}
+            0
+          {% else %}
+            {% set current_power = states('sensor.climate_energy_total_power_hybrid') | float(0) %}
+            {% set humidity = states('sensor.average_house_humidity_combined') | float(55) %}
+            {% set temperature = states('sensor.average_house_temperature_combined') | float(75) %}
+
+            {# Gulf Coast efficiency factors #}
+            {% set humidity_efficiency = 100 - ((humidity - 45) * 2) if humidity > 45 else 100 %}
+            {% set temp_efficiency = 100 - ((temperature - 75) * 3) if temperature > 75 else 100 %}
+            {% set power_efficiency = 100 - (current_power / 50) if current_power > 1000 else 100 %}
+
+            {% set combined_efficiency = (humidity_efficiency + temp_efficiency + power_efficiency) / 3 %}
+            {{ [0, combined_efficiency] | max | round(1) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set analytics_enabled = is_state('input_boolean.climate_energy_efficiency_analytics', 'on') %}
+          {{ master_enabled and analytics_enabled }}
+        attributes:
+          current_humidity: "{{ states('sensor.average_house_humidity_combined') | float(55) }}%"
+          current_temperature: "{{ states('sensor.average_house_temperature_combined') | float(75) }}°F"
+          current_power: "{{ states('sensor.climate_energy_total_power_hybrid') | float(0) }}W"
+          efficiency_grade: >
+            {% set score = states('sensor.gulf_coast_energy_efficiency_score') | float(0) %}
+            {% if score >= 95 %}
+              A+
+            {% elif score >= 90 %}
+              A
+            {% elif score >= 85 %}
+              B+
+            {% elif score >= 80 %}
+              B
+            {% elif score >= 75 %}
+              C+
+            {% elif score >= 70 %}
+              C
+            {% else %}
+              D
+            {% endif %}
+
+      # ==========================================================================
+      # PHASE 3 SAVINGS TRACKING - CONTINUES PROGRESS
+      # ==========================================================================
+
+      # PHASE 3A FAN COORDINATION SAVINGS
+      - name: "Phase 3A Fan Coordination Daily Savings"
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set tracking_enabled = is_state('input_boolean.enable_phase3a_fan_coordination_tracking', 'on') %}
+
+          {% if not master_enabled or not tracking_enabled %}
+            0.0
+          {% else %}
+            {% set baseline_fan_runtime = 4.5 %}
+            {% set current_fan_runtime = states('sensor.fan_coordination_daily_runtime') | float(0) %}
+            {% set fan_power_rating = 75 %}
+
+            {% set baseline_daily_kwh = (baseline_fan_runtime * fan_power_rating / 1000) %}
+            {% set current_daily_kwh = (current_fan_runtime * fan_power_rating / 1000) %}
+            {% set savings_kwh = (baseline_daily_kwh - current_daily_kwh) | round(3) %}
+
+            {{ savings_kwh if savings_kwh > 0 else 0 }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set tracking_enabled = is_state('input_boolean.enable_phase3a_fan_coordination_tracking', 'on') %}
+          {{ master_enabled and tracking_enabled }}
+
+      # PHASE 3B HUMIDITY COORDINATION SAVINGS
+      - name: "Phase 3B Humidity Coordination Daily Savings"
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set tracking_enabled = is_state('input_boolean.enable_phase3b_humidity_coordination_tracking', 'on') %}
+
+          {% if not master_enabled or not tracking_enabled %}
+            0.0
+          {% else %}
+            {% set baseline_dehumidifier_runtime = 6.5 %}
+            {% set current_dehumidifier_runtime = states('sensor.dehumidifier_runtime_today') | float(0) %}
+            {% set dehumidifier_power_rating = 500 %}
+
+            {% set baseline_daily_kwh = (baseline_dehumidifier_runtime * dehumidifier_power_rating / 1000) %}
+            {% set current_daily_kwh = (current_dehumidifier_runtime * dehumidifier_power_rating / 1000) %}
+            {% set savings_kwh = (baseline_daily_kwh - current_daily_kwh) | round(3) %}
+
+            {% set hvac_coordination_efficiency = 0.08 %}
+            {% set hvac_daily_kwh = states('sensor.hvac_energy_daily') | float(0.5) %}
+            {% set hvac_savings_kwh = (hvac_daily_kwh * hvac_coordination_efficiency) | round(3) %}
+
+            {{ (savings_kwh + hvac_savings_kwh) if (savings_kwh + hvac_savings_kwh) > 0 else 0 }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set tracking_enabled = is_state('input_boolean.enable_phase3b_humidity_coordination_tracking', 'on') %}
+          {{ master_enabled and tracking_enabled }}
+
+      # COMBINED PHASE 3 SAVINGS
+      - name: "Phase 3 Combined Daily Energy Savings"
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set tracking_enabled = is_state('input_boolean.enable_phase3_baseline_tracking', 'on') %}
+
+          {% if not master_enabled or not tracking_enabled %}
+            0.0
+          {% else %}
+            {% set phase3a_savings = states('sensor.phase3a_fan_coordination_daily_savings') | float(0) %}
+            {% set phase3b_savings = states('sensor.phase3b_humidity_coordination_daily_savings') | float(0) %}
+            {{ (phase3a_savings + phase3b_savings) | round(3) }}
+          {% endif %}
+        availability: >
+          {% set master_enabled = is_state('input_boolean.climate_energy_management_master', 'on') %}
+          {% set tracking_enabled = is_state('input_boolean.enable_phase3_baseline_tracking', 'on') %}
+          {{ master_enabled and tracking_enabled }}
+        attributes:
+          daily_cost_savings_dollars: >
+            {% set kwh_savings = states('sensor.phase3_combined_daily_savings') | float(0) %}
+            {% set cost_per_kwh = states('input_number.electricity_rate') | float(18.0) / 100 %}
+            {{ (kwh_savings * cost_per_kwh) | round(4) }}
+          annual_savings_projection: >
+            {% set daily_savings_dollars =
+              state_attr('sensor.phase3_combined_daily_savings', 'daily_cost_savings_dollars')
+              | float(0) %}
+            {% set annual_projection = (daily_savings_dollars * 365) | round(0) %}
+            ${{ annual_projection }}/year
+          target_progress: >
+            {% set daily_savings_dollars =
+              state_attr('sensor.phase3_combined_daily_savings', 'daily_cost_savings_dollars')
+              | float(0) %}
+            {% set annual_projection = (daily_savings_dollars * 365) | round(0) %}
+            {% set target_mid = 740 %}
+            {% set progress_percent = (annual_projection / target_mid * 100) | round(1) %}
+            {{ progress_percent }}% toward $520-960 target
+
+      # ==========================================================================
+      # SIMPLE ENERGY STATUS INDICATORS (from climate_energy_tracking.yaml)
+      # ==========================================================================
+
+      # CLIMATE ENERGY STATUS
+      - name: "Climate Energy Status"
+        state: >
+          {% if not is_state('input_boolean.energy_tracking_enabled', 'on') %}
+            Tracking Disabled
+          {% else %}
+            {% set hvac_action = state_attr('climate.thermostat', 'hvac_action') %}
+            {% set dehumidifier_on = is_state('switch.dehumidifier_relay_l1', 'on') %}
+
+            {% if hvac_action == 'cooling' %}
+              HVAC Cooling
+            {% elif hvac_action == 'heating' %}
+              HVAC Heating
+            {% elif dehumidifier_on %}
+              Dehumidifier Active
+            {% elif hvac_action == 'idle' %}
+              System Idle
+            {% else %}
+              System Off
+            {% endif %}
+          {% endif %}
+        icon: >
+          {% set status = states('sensor.climate_energy_status') %}
+          {% if 'HVAC Cooling' in status %}mdi:snowflake
+          {% elif 'HVAC Heating' in status %}mdi:fire
+          {% elif 'Dehumidifier' in status %}mdi:air-humidifier
+          {% elif 'Idle' in status %}mdi:pause-circle
+          {% elif 'Off' in status %}mdi:power-off
+          {% else %}mdi:chart-line-variant
+          {% endif %}
+        attributes:
+          hvac_action: "{{ state_attr('climate.thermostat', 'hvac_action') }}"
+          dehumidifier_state: "{{ states('switch.dehumidifier_relay_l1') }}"
+          tracking_enabled: "{{ is_state('input_boolean.energy_tracking_enabled', 'on') }}"
+
+      # DAILY CLIMATE COST ESTIMATE
+      - name: "Daily Climate Cost Estimate"
+        unit_of_measurement: "$"
+        device_class: monetary
+        state: >
+          {% if not is_state('input_boolean.cost_monitoring_enabled', 'on') %}
+            0
+          {% else %}
+            {% set rate = states('input_number.electricity_rate') | float(18.0) / 100 %}
+            {% set hvac_action = state_attr('climate.thermostat', 'hvac_action') %}
+            {% set dehumidifier_on = is_state('switch.dehumidifier_relay_l1', 'on') %}
+
+            {% set hvac_consumption = 3.5 if hvac_action in ['cooling', 'heating'] else 0 %}
+            {% set dehumidifier_consumption = 0.7 if dehumidifier_on else 0 %}
+            {% set total_kw = hvac_consumption + dehumidifier_consumption %}
+
+            {{ (total_kw * 8 * rate) | round(2) }}
+          {% endif %}
+        attributes:
+          rate_per_kwh: "{{ states('input_number.electricity_rate') }}¢"
+          estimated_daily_kwh: >
+            {% set hvac_action = state_attr('climate.thermostat', 'hvac_action') %}
+            {% set dehumidifier_on = is_state('switch.dehumidifier_relay_l1', 'on') %}
+            {% set hvac_consumption = 3.5 if hvac_action in ['cooling', 'heating'] else 0 %}
+            {% set dehumidifier_consumption = 0.7 if dehumidifier_on else 0 %}
+            {% set total_kw = hvac_consumption + dehumidifier_consumption %}
+            {{ (total_kw * 8) | round(1) }} kWh
+
+      # MONTHLY COST PROJECTION
+      - name: "Monthly Climate Cost Projection"
+        unit_of_measurement: "$"
+        device_class: monetary
+        state: >
+          {% if not is_state('input_boolean.cost_monitoring_enabled', 'on') %}
+            0
+          {% else %}
+            {% set daily_cost = states('sensor.daily_climate_cost_estimate') | float(0) %}
+            {{ (daily_cost * 30) | round(0) }}
+          {% endif %}
+        attributes:
+          budget: "{{ states('input_number.monthly_climate_budget') }}"
+          budget_status: >
+            {% set projection = states('sensor.monthly_climate_cost_projection') | float(0) %}
+            {% set budget = states('input_number.monthly_climate_budget') | float(200) %}
+            {% if projection == 0 %}
+              Unknown
+            {% elif projection <= budget * 0.8 %}
+              Under Budget
+            {% elif projection <= budget %}
+              On Budget
+            {% elif projection <= budget * 1.2 %}
+              Over Budget
+            {% else %}
+              Significantly Over Budget
+            {% endif %}
+
+sensor:
+
+  # ==========================================================================
+  # INTEGRATION SENSORS - POWER TO ENERGY CONVERSION
+  # ==========================================================================
+
+  # DEHUMIDIFIER ENERGY INTEGRATION (POWER → ENERGY)
+  - platform: integration
+    source: sensor.climate_energy_dehumidifier_power_hybrid
+    name: "Dehumidifier Energy Integration"
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+
+  # HVAC ENERGY INTEGRATION (POWER → ENERGY)
+  - platform: integration
+    source: sensor.climate_energy_hvac_power_hybrid
+    name: "HVAC Energy Integration"
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+
+  # FANS ENERGY INTEGRATION (POWER → ENERGY)
+  - platform: integration
+    source: sensor.climate_energy_fans_power_hybrid
+    name: "Fans Energy Integration"
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+
+  # TOTAL CLIMATE ENERGY INTEGRATION (POWER → ENERGY)
+  - platform: integration
+    source: sensor.climate_energy_total_power_hybrid
+    name: "Total Climate Energy Integration"
+    unit_prefix: k
+    round: 3
+    method: trapezoidal
+
+  # ==========================================================================
+  # RUNTIME TRACKING SENSORS - HISTORY STATS PLATFORM
+  # ==========================================================================
+
+  # DEHUMIDIFIER RUNTIME TODAY
+  - platform: history_stats
+    name: "Dehumidifier Runtime Today"
+    entity_id: binary_sensor.dehumidifier_runtime_status
+    state: 'on'
+    type: time
+    start: '{{ now().replace(hour=0, minute=0, second=0) }}'
+    end: '{{ now() }}'
+
+  # HVAC RUNTIME TODAY
+  - platform: history_stats
+    name: "HVAC Runtime Today"
+    entity_id: binary_sensor.hvac_runtime_status
+    state: 'on'
+    type: time
+    start: '{{ now().replace(hour=0, minute=0, second=0) }}'
+    end: '{{ now() }}'
+
+# -----------------------------------------------------------------------------
+# UTILITY METERS - DAILY/WEEKLY/MONTHLY TRACKING
+# -----------------------------------------------------------------------------
+utility_meter:
+  # Individual equipment tracking (FIXED: Using energy integration sensors with new entity names)
+  dehumidifier_energy_daily_meter_fixed:
+    source: sensor.dehumidifier_energy_integration
+    cycle: daily
+    name: "Dehumidifier Daily Energy (Fixed)"
+
+  hvac_energy_daily_meter_fixed:
+    source: sensor.hvac_energy_integration
+    cycle: daily
+    name: "HVAC Daily Energy (Fixed)"
+
+  fans_energy_daily_meter_fixed:
+    source: sensor.fans_energy_integration
+    cycle: daily
+    name: "Fans Daily Energy (Fixed)"
+
+  # Total climate energy tracking (FIXED: Using energy integration sensors with new entity names)
+  climate_total_energy_daily_meter_fixed:
+    source: sensor.total_climate_energy_integration
+    cycle: daily
+    name: "Total Climate Daily Energy (Fixed)"
+
+  climate_total_energy_weekly_meter_fixed:
+    source: sensor.total_climate_energy_integration
+    cycle: weekly
+    name: "Total Climate Weekly Energy (Fixed)"
+
+  climate_total_energy_monthly_meter_fixed:
+    source: sensor.total_climate_energy_integration
+    cycle: monthly
+    name: "Total Climate Monthly Energy (Fixed)"
+
+  # Phase 3 savings tracking
+  phase3a_fan_coordination_weekly_savings:
+    source: sensor.phase3a_fan_coordination_daily_savings
+    cycle: weekly
+    name: "Phase 3A Fan Coordination Weekly Savings"
+
+  phase3a_fan_coordination_monthly_savings:
+    source: sensor.phase3a_fan_coordination_daily_savings
+    cycle: monthly
+    name: "Phase 3A Fan Coordination Monthly Savings"
+
+  phase3b_humidity_coordination_weekly_savings:
+    source: sensor.phase3b_humidity_coordination_daily_savings
+    cycle: weekly
+    name: "Phase 3B Humidity Coordination Weekly Savings"
+
+  phase3b_humidity_coordination_monthly_savings:
+    source: sensor.phase3b_humidity_coordination_daily_savings
+    cycle: monthly
+    name: "Phase 3B Humidity Coordination Monthly Savings"
+
+  phase3_combined_weekly_savings:
+    source: sensor.phase3_combined_daily_savings
+    cycle: weekly
+    name: "Phase 3 Combined Weekly Savings"
+
+  phase3_combined_monthly_savings:
+    source: sensor.phase3_combined_daily_savings
+    cycle: monthly
+    name: "Phase 3 Combined Monthly Savings"
+
+# ENERGY MANAGEMENT AUTOMATIONS - HOME ASSISTANT 2025.9.1 COMPLIANT
+# -----------------------------------------------------------------------------
+automation:
+  # HIGH LOAD MANAGEMENT NOTIFICATION
+  # DISABLED: Requires sensor.climate_energy_total_power_hybrid (smart plugs/Vue 3 not installed)
+  # - id: energy_management_high_load_notification
+  #   alias: "Energy Management: High Load Alert"
+  #   description: "Alert when energy load requires management"
+  #   trigger:
+  #     - platform: numeric_state
+  #       entity_id: sensor.climate_energy_total_power_hybrid
+  #       above: input_number.energy_high_load_threshold
+  #       for:
+  #         minutes: 5
+  #   condition:
+  #     - condition: state
+  #       entity_id: input_boolean.climate_energy_management_master
+  #       state: 'on'
+  #     - condition: state
+  #       entity_id: input_boolean.climate_energy_real_time_monitoring
+  #       state: 'on'
+  #   action:
+  #     - action: persistent_notification.create
+  #       data:
+  #         title: "⚡ Energy Management Alert"
+  #         message: >
+  #           High energy load detected: {{ states('sensor.climate_energy_total_power_hybrid') }}W
+  #
+  #           Current loads:
+  #           - Dehumidifier: {{ states('sensor.climate_energy_dehumidifier_power_hybrid') }}W
+  #           - HVAC: {{ states('sensor.climate_energy_hvac_power_hybrid') }}W
+  #           - Fans: {{ states('sensor.climate_energy_fans_power_hybrid') }}W
+  #
+  #           Consider staggering equipment operation
+  #         notification_id: energy_high_load
+
+  # DAILY COST ALERT
+  # DISABLED: Requires sensor.energy_validation_total_daily_cost (smart plugs/Vue 3 not installed)
+  # - id: energy_management_cost_alert
+  #   alias: "Energy Management: Daily Cost Alert"
+  #   description: "Alert when daily energy costs exceed thresholds"
+  #   trigger:
+  #     - platform: numeric_state
+  #       entity_id: sensor.energy_validation_total_daily_cost
+  #       above: input_number.energy_cost_alert_threshold
+  #   condition:
+  #     - condition: state
+  #       entity_id: input_boolean.climate_energy_management_master
+  #       state: 'on'
+  #     - condition: state
+  #       entity_id: input_boolean.climate_energy_cost_optimization
+  #       state: 'on'
+  #   action:
+  #     - action: persistent_notification.create
+  #       data:
+  #         title: "💰 Daily Cost Alert"
+  #         message: >
+  #           Daily energy cost: ${{ states('sensor.energy_validation_total_daily_cost') }}
+  #
+  #           Threshold: ${{ states('input_number.energy_cost_alert_threshold') }}
+  #           Monthly projection:
+  #             ${{ (states('sensor.energy_validation_total_daily_cost') | float(0) * 30)
+  #                 | round(2) }}
+  #
+  #           Current savings progress:
+  #             {{ state_attr('sensor.energy_validation_total_daily_cost',
+  #                           'savings_progress') }}
+  #         notification_id: energy_cost_alert
+
+  # DAILY COST SUMMARY NOTIFICATION
+  - id: daily_energy_cost_summary
+    alias: "Daily Energy Cost Summary"
+    description: "Daily summary of climate energy costs"
+    trigger:
+      - platform: time
+        at: "22:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.cost_monitoring_enabled
+        state: 'on'
+    action:
+      - variables:
+          daily_cost: "{{ states('sensor.daily_climate_cost_estimate') }}"
+          monthly_projection: "{{ states('sensor.monthly_climate_cost_projection') }}"
+          budget_status: "{{ state_attr('sensor.monthly_climate_cost_projection', 'budget_status') }}"
+      - action: notify.mobile_app_drews_iphone
+        data:
+          title: "💰 Daily Climate Cost Summary"
+          message: >
+            Daily Cost: ${{ daily_cost }}
+            Monthly Projection: ${{ monthly_projection }}
+            Budget Status: {{ budget_status }}
+
+            Gulf Coast Efficiency: {{ states('sensor.gulf_coast_energy_efficiency_score') }}%
+          data:
+            tag: "daily_cost_summary"
+            group: "energy"
+    mode: single
+
+  # MONTHLY BUDGET WARNING
+  - id: monthly_budget_warning
+    alias: "Monthly Budget Warning"
+    description: "Warning when monthly projection exceeds budget"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.monthly_climate_cost_projection
+        above: input_number.monthly_climate_budget
+        for:
+          hours: 2
+    condition:
+      - condition: state
+        entity_id: input_boolean.cost_monitoring_enabled
+        state: 'on'
+    action:
+      - variables:
+          projection: "{{ states('sensor.monthly_climate_cost_projection') }}"
+          budget: "{{ states('input_number.monthly_climate_budget') }}"
+      - action: notify.mobile_app_drews_iphone
+        data:
+          title: "⚠️ Climate Budget Warning"
+          message: >
+            Monthly projection: ${{ projection }}
+            Budget: ${{ budget }}
+
+            Consider using Away mode more or adjusting setpoints
+          data:
+            tag: "budget_warning"
+            group: "energy"
+    mode: single
+
+# -----------------------------------------------------------------------------
+# ENERGY MANAGEMENT SCRIPTS
+# -----------------------------------------------------------------------------
+script:
+  # ENERGY STATUS UPDATE
+  energy_management_status_update:
+    alias: "Update Energy Management Status"
+    description: "Refresh all energy management sensors and provide status summary"
+    sequence:
+      - action: homeassistant.update_entity
+        entity_id:
+          - sensor.climate_energy_total_power_hybrid
+          - sensor.energy_validation_total_daily_cost
+          - sensor.gulf_coast_energy_efficiency_score
+          - sensor.phase3_combined_daily_savings
+      - delay:
+          seconds: 3
+      - action: persistent_notification.create
+        data:
+          title: "⚡ Energy Management Status"
+          message: >
+            Total Power: {{ states('sensor.climate_energy_total_power_hybrid') }}W
+            Daily Cost: ${{ states('sensor.energy_validation_total_daily_cost') }}
+            Efficiency Score: {{ states('sensor.gulf_coast_energy_efficiency_score') }}%
+
+            Daily Savings: {{ states('sensor.phase3_combined_daily_savings') }} kWh
+            Annual Progress: {{ state_attr('sensor.phase3_combined_daily_savings', 'annual_savings_projection') }}
+            Target Progress: {{ state_attr('sensor.phase3_combined_daily_savings', 'target_progress') }}
+          notification_id: energy_management_status
+
+  # ENABLE ALL ENERGY TRACKING
+  energy_tracking_enable:
+    alias: "Enable Energy Tracking"
+    sequence:
+      - action: input_boolean.turn_on
+        target:
+          entity_id:
+            - input_boolean.climate_energy_management_master
+            - input_boolean.climate_energy_real_time_monitoring
+            - input_boolean.climate_energy_cost_optimization
+            - input_boolean.climate_energy_efficiency_analytics
+            - input_boolean.energy_tracking_enabled
+            - input_boolean.cost_monitoring_enabled
+            - input_boolean.savings_estimation_enabled
+      - action: notify.mobile_app_drews_iphone
+        data:
+          title: "⚡ Energy Management Enabled"
+          message: "All energy tracking systems activated"
+
+  # DISABLE ALL ENERGY TRACKING
+  energy_tracking_disable:
+    alias: "Disable Energy Tracking"
+    sequence:
+      - action: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.climate_energy_management_master
+            - input_boolean.climate_energy_real_time_monitoring
+            - input_boolean.climate_energy_cost_optimization
+            - input_boolean.climate_energy_efficiency_analytics
+            - input_boolean.energy_tracking_enabled
+            - input_boolean.cost_monitoring_enabled
+            - input_boolean.savings_estimation_enabled
+      - action: notify.mobile_app_drews_iphone
+        data:
+          title: "⚡ Energy Management Disabled"
+          message: "All energy tracking systems deactivated"
+
+  # ENERGY STATUS REPORT
+  energy_status_report:
+    alias: "Energy Status Report"
+    sequence:
+      - action: notify.mobile_app_drews_iphone
+        data:
+          title: "⚡ Energy Status Report"
+          message: >
+            Current Status: {{ states('sensor.climate_energy_status') }}
+            Daily Cost: ${{ states('sensor.daily_climate_cost_estimate') }}
+            Monthly Projection: ${{ states('sensor.monthly_climate_cost_projection') }}
+
+            Phase 3 Savings: {{ states('sensor.phase3_combined_daily_savings') }} kWh/day
+            Annual Progress: {{ state_attr('sensor.phase3_combined_daily_savings', 'annual_savings_projection') }}
+
+            Gulf Coast Efficiency: {{ states('sensor.gulf_coast_energy_efficiency_score') }}%
+            Rate: {{ states('input_number.electricity_rate') }}¢/kWh
+            Budget: ${{ states('input_number.monthly_climate_budget') }}
+
+  # ACTIVATE SAVINGS MODE
+  activate_savings_mode:
+    alias: "Activate Savings Mode"
+    sequence:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.occupancy_mode
+        data:
+          option: "Away"
+      - action: notify.mobile_app_drews_iphone
+        data:
+          title: "💰 Savings Mode Activated"
+          message: >
+            Switched to Away mode for energy savings
+
+            Current daily cost: ${{ states('sensor.daily_climate_cost_estimate') }}
+            Gulf Coast efficiency: {{ states('sensor.gulf_coast_energy_efficiency_score') }}%
+
+# -----------------------------------------------------------------------------
+# ENTITY CUSTOMIZATIONS - ICONS AND DISPLAY
+# -----------------------------------------------------------------------------
+homeassistant:
+  customize:
+    # Energy Management Master Controls
+    input_boolean.climate_energy_management_master:
+      icon: mdi:lightning-bolt
+    input_boolean.climate_energy_real_time_monitoring:
+      icon: mdi:chart-line
+    input_boolean.climate_energy_cost_optimization:
+      icon: mdi:currency-usd
+    input_boolean.climate_energy_efficiency_analytics:
+      icon: mdi:speedometer
+    input_boolean.climate_energy_future_hardware:
+      icon: mdi:home-lightning-bolt
+
+    # Main Energy Sensors
+    sensor.climate_energy_total_power_hybrid:
+      icon: mdi:home-lightning-bolt
+    sensor.climate_energy_dehumidifier_power_hybrid:
+      icon: mdi:water-percent
+    sensor.climate_energy_hvac_power_hybrid:
+      icon: mdi:air-conditioner
+    sensor.climate_energy_fans_power_hybrid:
+      icon: mdi:fan
+
+    # Cost and Efficiency Sensors
+    sensor.energy_validation_total_daily_cost:
+      icon: mdi:currency-usd
+    sensor.gulf_coast_energy_efficiency_score:
+      icon: mdi:speedometer
+    sensor.climate_energy_status:
+      icon: mdi:lightning-bolt-circle
+    sensor.daily_climate_cost_estimate:
+      icon: mdi:currency-usd
+    sensor.monthly_climate_cost_projection:
+      icon: mdi:calendar-month
+
+    # Phase 3 Savings Sensors
+    sensor.phase3a_fan_coordination_daily_savings:
+      icon: mdi:fan-chevron-up
+    sensor.phase3b_humidity_coordination_daily_savings:
+      icon: mdi:water-percent-alert
+    sensor.phase3_combined_daily_savings:
+      icon: mdi:chart-line-stacked
+
+    # Binary Sensors
+    binary_sensor.phase3_baseline_tracking_operational:
+      icon: mdi:check-circle
+    binary_sensor.dehumidifier_runtime_status:
+      icon: mdi:water-percent
+    binary_sensor.hvac_runtime_status:
+      icon: mdi:air-conditioner
+
+# =============================================================================
+# END CLIMATE ENERGY MANAGEMENT - UNIFIED SYSTEM
+# =============================================================================
+# Package #7/8 Complete: Consolidated 4 energy packages into unified system
+# - All energy monitoring, tracking, and optimization consolidated ✅
+# - KISS dashboard controls with 5 main toggles ✅
+# - $548/year savings progress tracking continued ✅
+# - Gulf Coast ML14XC1/E130 coordination preserved ✅
+# - 15-sensor integration compatibility maintained ✅
+# - Modern Home Assistant 2025.9.1 syntax compliance ✅
+# - Future hardware integration framework ready ✅
+#
+# NEXT: Package #8 - climate_interface_management.yaml (Final package)
+# =============================================================================

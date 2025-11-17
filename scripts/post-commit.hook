@@ -1,0 +1,257 @@
+#!/bin/bash
+# Enhanced Post-commit hook: Deploy with automated verification
+# This ensures live server is in sync AND validates before reload
+# Option A-Strict implementation (bugs fixed)
+# Dashboard workflow cycle time: ~16 seconds (edit → commit → deploy → validate → refresh)
+
+REPO="/home/drewcifer/homeassistant-config"
+LIVE="/home/drewcifer/mnt/homeassistant-config"
+
+# Load secrets from secure location (instead of hardcoding)
+if [ -f "$REPO/state/secrets.env" ]; then
+    source "$REPO/state/secrets.env"
+else
+    echo "❌ CRITICAL: secrets.env not found"
+    echo "   Create $REPO/state/secrets.env with HA_TOKEN"
+    exit 1
+fi
+
+# Validate token is loaded
+if [ -z "$HA_TOKEN" ]; then
+    echo "❌ CRITICAL: HA_TOKEN not set in secrets.env"
+    exit 1
+fi
+
+# Set HA base URL (can be overridden in secrets.env)
+HA_BASE="${HA_BASE:-http://192.168.88.125:8123}"
+
+# SAFETY CHECK: Ensure CIFS mount is active
+if ! mountpoint -q "$LIVE"; then
+    echo "❌ CRITICAL: $LIVE is not mounted"
+    echo "   CIFS share may be disconnected - aborting deployment"
+    echo "   This prevents rsync from writing to empty local directory"
+    exit 1
+fi
+
+echo "🚀 Deploying to live Home Assistant server..."
+
+# Deploy ONLY operational files to live server
+# Development/documentation stays in git repo only
+# --inplace: Update files directly (required for CIFS/SMB mounts)
+rsync -av --delete --inplace \
+    --exclude='.git/' \
+    --exclude='.gitignore' \
+    --exclude='.last-deployment' \
+    --exclude='.claude/' \
+    --exclude='docs/' \
+    --exclude='archive/' \
+    --exclude='archived_data/' \
+    --exclude='archived_projects/' \
+    --exclude='temp/' \
+    --exclude='zigbee2mqtt/' \
+    --exclude='*.md' \
+    --exclude='*.log' \
+    --exclude='*.db' \
+    --exclude='*.db-shm' \
+    --exclude='*.db-wal' \
+    --exclude='.storage/' \
+    --exclude='home-assistant.log' \
+    --exclude='home-assistant_*.log' \
+    --exclude='*.backup' \
+    --exclude='*.bak' \
+    --exclude='__pycache__/' \
+    --exclude='*.pyc' \
+    "$REPO/" "$LIVE/" 2>/dev/null
+
+RSYNC_EXIT=$?
+
+# Check rsync exit code
+# Exit 0 = perfect sync
+if [ $RSYNC_EXIT -ne 0 ]; then
+    echo "❌ Rsync failed with exit code $RSYNC_EXIT"
+    echo "⚠️  Deployment may be incomplete - check manually"
+    exit 1
+fi
+
+echo "✅ Files deployed to $LIVE"
+echo "🔍 Validating configuration..."
+
+# Validate HA configuration via API
+# Capture both response body and HTTP status code
+CONFIG_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Authorization: Bearer $HA_TOKEN" \
+    -H "Content-Type: application/json" \
+    "$HA_BASE/api/config/core/check_config" 2>&1)
+
+# Extract HTTP code and response body
+HTTP_CODE=$(echo "$CONFIG_RESPONSE" | tail -n1)
+CONFIG_CHECK=$(echo "$CONFIG_RESPONSE" | head -n-1)
+
+# Check HTTP status first
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "❌ Configuration validation API failed (HTTP $HTTP_CODE)"
+    echo "   HA server may be unavailable or token may be invalid"
+    echo "   Deployment succeeded but validation inconclusive"
+    echo ""
+    echo "   Verify manually:"
+    echo "   • Check HA is running: $HA_BASE"
+    echo "   • Check token is valid in HA UI"
+    exit 0  # Don't fail the commit, but warn user
+fi
+
+# Check if config is valid (HA returns "result":"valid" or "result":"invalid")
+if echo "$CONFIG_CHECK" | grep -q '"result":"valid"'; then
+    echo "✅ Configuration validated successfully (HTTP $HTTP_CODE)"
+    echo ""
+    echo "🔍 Analyzing changed files to determine action needed..."
+
+    # Get list of changed files
+    CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+
+    # Categorize changes
+    NEEDS_RESTART=false
+    NEEDS_AUTO_RELOAD=false
+    NEEDS_DASHBOARD_REFRESH=false
+    RELOAD_AUTOMATIONS=false
+    RELOAD_SCRIPTS=false
+    RELOAD_TEMPLATES=false
+
+    # Analyze each changed file
+    while IFS= read -r file; do
+        case "$file" in
+            # Full restart required
+            packages/*.yaml)
+                NEEDS_RESTART=true
+                ;;
+            configuration.yaml)
+                NEEDS_RESTART=true
+                ;;
+            custom_components/*)
+                NEEDS_RESTART=true
+                ;;
+            customization/*.yaml)
+                NEEDS_RESTART=true
+                ;;
+
+            # Auto-reloadable components
+            automations/*.yaml)
+                RELOAD_AUTOMATIONS=true
+                NEEDS_AUTO_RELOAD=true
+                ;;
+            scripts/*.yaml)
+                RELOAD_SCRIPTS=true
+                NEEDS_AUTO_RELOAD=true
+                ;;
+            templates/*.yaml)
+                RELOAD_TEMPLATES=true
+                NEEDS_AUTO_RELOAD=true
+                ;;
+
+            # Dashboard refresh only
+            dashboards/*.yaml|ui-lovelace*.yaml)
+                NEEDS_DASHBOARD_REFRESH=true
+                ;;
+
+            # Documentation/non-operational files (no action)
+            *.md|docs/*|archive/*|temp/*|.claude/*|scripts/*)
+                # No action needed
+                ;;
+        esac
+    done <<< "$CHANGED_FILES"
+
+    # Take appropriate action based on what changed
+    if [ "$NEEDS_RESTART" = true ]; then
+        echo "⚠️  FULL RESTART REQUIRED"
+        echo "   Changed files require Home Assistant restart:"
+        echo "$CHANGED_FILES" | grep -E "(packages/|configuration\.yaml|custom_components/|customization/)" | sed 's/^/   - /'
+        echo ""
+        echo "   Run: bash scripts/ha-restart.sh"
+        echo "   Or via UI: Settings → System → Restart"
+
+    elif [ "$NEEDS_AUTO_RELOAD" = true ]; then
+        echo "🔄 Auto-reloading changed components..."
+
+        # Reload automations
+        if [ "$RELOAD_AUTOMATIONS" = true ]; then
+            echo "   → Reloading automations..."
+            curl -s -X POST \
+                -H "Authorization: Bearer $HA_TOKEN" \
+                -H "Content-Type: application/json" \
+                "$HA_BASE/api/services/automation/reload" > /dev/null
+        fi
+
+        # Reload scripts
+        if [ "$RELOAD_SCRIPTS" = true ]; then
+            echo "   → Reloading scripts..."
+            curl -s -X POST \
+                -H "Authorization: Bearer $HA_TOKEN" \
+                -H "Content-Type: application/json" \
+                "$HA_BASE/api/services/script/reload" > /dev/null
+        fi
+
+        # Reload templates
+        if [ "$RELOAD_TEMPLATES" = true ]; then
+            echo "   → Reloading template sensors..."
+            curl -s -X POST \
+                -H "Authorization: Bearer $HA_TOKEN" \
+                -H "Content-Type: application/json" \
+                "$HA_BASE/api/services/template/reload" > /dev/null
+        fi
+
+        echo "   ✅ Reload complete - changes are live!"
+
+        # If dashboard also changed, remind to refresh browser
+        if [ "$NEEDS_DASHBOARD_REFRESH" = true ]; then
+            echo ""
+            echo "   📊 Also: Refresh tablet browser for dashboard changes"
+        fi
+
+    elif [ "$NEEDS_DASHBOARD_REFRESH" = true ]; then
+        echo "📊 Dashboard changes only"
+        echo "   → Refresh tablet browser to see changes"
+        echo "   (YAML dashboards require manual browser refresh)"
+
+    else
+        echo "ℹ️  No Home Assistant action needed"
+        echo "   Changes are documentation/non-operational files only"
+    fi
+
+elif echo "$CONFIG_CHECK" | grep -q '"result":"invalid"'; then
+    echo "❌ Configuration validation FAILED"
+    echo "⚠️  Live server has invalid config - DO NOT RESTART HA"
+    echo "   Review errors and fix before restarting"
+    echo ""
+    echo "$CONFIG_CHECK" | jq '.errors' 2>/dev/null || echo "$CONFIG_CHECK"
+
+    # Log failed deployment
+    {
+        echo "Deployment Log"
+        echo "=============="
+        echo "Timestamp: $(date)"
+        echo "Commit: $(git rev-parse --short HEAD)"
+        echo "Message: $(git log -1 --pretty=%B)"
+        echo "Status: FAILED - Invalid configuration"
+        echo "Files attempted: $(git diff --name-only HEAD~1 HEAD | wc -l)"
+    } > .last-deployment
+
+    exit 1
+fi
+
+# Log successful deployment (only reached if validation passed)
+{
+    echo "Deployment Log"
+    echo "=============="
+    echo "Timestamp: $(date)"
+    echo "Commit: $(git rev-parse --short HEAD)"
+    echo "Message: $(git log -1 --pretty=%B)"
+    echo "Status: Success"
+    echo "Files deployed: $(git diff --name-only HEAD~1 HEAD | wc -l)"
+} > .last-deployment
+
+echo ""
+echo "📋 Deployment logged to .last-deployment"
+echo ""
+echo "🎯 Deployment complete - verify via:"
+echo "   • Browser: $HA_BASE"
+echo "   • API: curl -H \"Authorization: Bearer \$HA_TOKEN\" $HA_BASE/api/states"
+echo "   • Tablet: Refresh dashboard"

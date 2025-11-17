@@ -1,0 +1,13 @@
+close_garage_door_1:
+  alias: Close Garage Door 1
+  sequence:
+    - service: cover.close_cover
+      target:
+        entity_id: cover.garage_door_1
+
+close_garage_door_2:
+  alias: Close Garage Door 2
+  sequence:
+    - service: cover.close_cover
+      target:
+        entity_id: cover.garage_door_2

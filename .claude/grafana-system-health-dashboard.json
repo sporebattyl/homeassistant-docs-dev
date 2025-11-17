@@ -1,0 +1,705 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "HASSBOT System Health",
+    "tags": ["system", "health", "maintenance", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-12h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Overview Status",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "climate_system_performance_score",
+            "legendFormat": "Performance Score",
+            "refId": "A"
+          },
+          {
+            "expr": "climate_system_maintenance_score",
+            "legendFormat": "Maintenance Score",
+            "refId": "B"
+          },
+          {
+            "expr": "system_uptime_percentage",
+            "legendFormat": "System Uptime",
+            "refId": "C"
+          },
+          {
+            "expr": "notification_system_status",
+            "legendFormat": "Notification System",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [
+              {"options": {"Ready for Notifications": {"color": "green", "index": 0}}, "type": "value"},
+              {"options": {"Throttling Active": {"color": "yellow", "index": 1}}, "type": "value"},
+              {"options": {"System Error": {"color": "red", "index": 2}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 40},
+                {"color": "green", "value": 70},
+                {"color": "dark-green", "value": 90}
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Notification System"},
+              "properties": [
+                {"id": "unit", "value": "string"},
+                {"id": "custom.displayMode", "value": "color-text"}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "HVAC System Health",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "hvac_system_health",
+            "legendFormat": "Health Status",
+            "refId": "A"
+          },
+          {
+            "expr": "thermostat_current_temperature",
+            "legendFormat": "Current Temperature",
+            "refId": "B"
+          },
+          {
+            "expr": "hvac_target_temperature",
+            "legendFormat": "Target Temperature",
+            "refId": "C"
+          },
+          {
+            "expr": "climate_thermostat_hvac_action == 'cooling' ? 1 : 0",
+            "legendFormat": "Cooling Active",
+            "refId": "D"
+          },
+          {
+            "expr": "climate_thermostat_hvac_action == 'heating' ? 1 : 0",
+            "legendFormat": "Heating Active",
+            "refId": "E"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [
+              {"options": {"Maintenance Due Soon": {"color": "yellow", "index": 0}}, "type": "value"},
+              {"options": {"Normal": {"color": "green", "index": 1}}, "type": "value"},
+              {"options": {"Critical": {"color": "red", "index": 2}}, "type": "value"}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "fahrenheit"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Health Status"},
+              "properties": [
+                {"id": "unit", "value": "string"},
+                {"id": "custom.drawStyle", "value": "points"},
+                {"id": "custom.pointSize", "value": 10},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byRegexp", "options": "/.*Active/"},
+              "properties": [
+                {"id": "custom.axisPlacement", "value": "right"},
+                {"id": "unit", "value": "short"},
+                {"id": "max", "value": 1.2},
+                {"id": "min", "value": -0.2},
+                {"id": "custom.fillOpacity", "value": 30}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "none"},
+          "legend": {"displayMode": "list", "placement": "bottom"},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Dehumidifier System Health",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "dehumidifier_system_health",
+            "legendFormat": "Health Status",
+            "refId": "A"
+          },
+          {
+            "expr": "dehumidifier_relay_power",
+            "legendFormat": "Power Consumption",
+            "refId": "B"
+          },
+          {
+            "expr": "dehumidifier_relay_device_temperature",
+            "legendFormat": "Device Temperature",
+            "refId": "C"
+          },
+          {
+            "expr": "average_house_humidity",
+            "legendFormat": "House Humidity",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Power Consumption"},
+              "properties": [
+                {"id": "unit", "value": "watt"},
+                {"id": "custom.axisPlacement", "value": "right"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Device Temperature"},
+              "properties": [
+                {"id": "unit", "value": "fahrenheit"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 100},
+                    {"color": "red", "value": 120}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "House Humidity"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "none"},
+          "legend": {"displayMode": "list", "placement": "bottom"},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Fan System Performance",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+        "targets": [
+          {
+            "expr": "fan_system_status",
+            "legendFormat": "System Status",
+            "refId": "A"
+          },
+          {
+            "expr": "fan_system_health",
+            "legendFormat": "Health Status", 
+            "refId": "B"
+          },
+          {
+            "expr": "living_room_fan_target_temperature",
+            "legendFormat": "Living Room Target",
+            "refId": "C"
+          },
+          {
+            "expr": "office_fan_target_temperature",
+            "legendFormat": "Office Target",
+            "refId": "D"
+          },
+          {
+            "expr": "master_bedroom_fan_target_temperature",
+            "legendFormat": "Master Bedroom Target",
+            "refId": "E"
+          },
+          {
+            "expr": "rowans_room_fan_target_temperature",
+            "legendFormat": "Rowan's Room Target",
+            "refId": "F"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "groupBy",
+            "options": {
+              "fields": {
+                "Time": {"aggregations": [], "operation": "groupby"},
+                "Value": {"aggregations": ["lastNotNull"], "operation": "aggregate"}
+              }
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "System Status": "Fan System Status",
+                "Health Status": "Overall Health",
+                "Living Room Target": "Living Room (°F)",
+                "Office Target": "Office (°F)",
+                "Master Bedroom Target": "Master Bedroom (°F)",
+                "Rowan's Room Target": "Rowan's Room (°F)"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "custom": {
+              "align": "center",
+              "displayMode": "color-background"
+            },
+            "mappings": [
+              {"options": {"Active": {"color": "green", "index": 0}}, "type": "value"},
+              {"options": {"High Usage": {"color": "yellow", "index": 1}}, "type": "value"},
+              {"options": {"Inactive": {"color": "gray", "index": 2}}, "type": "value"},
+              {"options": {"Error": {"color": "red", "index": 3}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 75},
+                {"color": "red", "value": 80}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "/.*°F.*/"},
+              "properties": [
+                {"id": "unit", "value": "fahrenheit"}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true
+        }
+      },
+      {
+        "id": 5,
+        "title": "Equipment Temperature Monitoring",
+        "type": "timeseries", 
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+        "targets": [
+          {
+            "expr": "dehumidifier_relay_device_temperature",
+            "legendFormat": "Dehumidifier Relay",
+            "refId": "A"
+          },
+          {
+            "expr": "motion_sensor_2_office_device_temperature",
+            "legendFormat": "Office Motion Sensor",
+            "refId": "B"
+          },
+          {
+            "expr": "motion_sensor_6_master_closet_device_temperature",
+            "legendFormat": "Master Closet Sensor",
+            "refId": "C"
+          },
+          {
+            "expr": "water_heater_leak_sensor_device_temperature",
+            "legendFormat": "Water Heater Area",
+            "refId": "D"
+          },
+          {
+            "expr": "pool_pump_air_temperature",
+            "legendFormat": "Pool Pump Area",
+            "refId": "E"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 8,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "axisLabel": "Temperature (°F)",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 90},
+                {"color": "orange", "value": 110},
+                {"color": "red", "value": 130}
+              ]
+            },
+            "unit": "fahrenheit"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Dehumidifier Relay"},
+              "properties": [
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}},
+                {"id": "custom.lineWidth", "value": 3}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "list", "placement": "bottom"},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Home Assistant Core System Health",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+        "targets": [
+          {
+            "expr": "home_assistant_core_cpu_percent",
+            "legendFormat": "CPU Usage",
+            "refId": "A"
+          },
+          {
+            "expr": "home_assistant_core_memory_percent",
+            "legendFormat": "Memory Usage",
+            "refId": "B"
+          },
+          {
+            "expr": "system_uptime_percentage",
+            "legendFormat": "System Uptime",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 60},
+                {"color": "orange", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "vertical",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "center"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Maintenance Tracking & Alerts",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 30},
+        "targets": [
+          {
+            "expr": "hvac_system_health",
+            "legendFormat": "HVAC Health",
+            "refId": "A"
+          },
+          {
+            "expr": "dehumidifier_system_health",
+            "legendFormat": "Dehumidifier Health",
+            "refId": "B"
+          },
+          {
+            "expr": "fan_system_health", 
+            "legendFormat": "Fan System Health",
+            "refId": "C"
+          },
+          {
+            "expr": "climate_system_maintenance_score",
+            "legendFormat": "Maintenance Score",
+            "refId": "D"
+          },
+          {
+            "expr": "climate_system_performance_score",
+            "legendFormat": "Performance Score",
+            "refId": "E"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "groupBy",
+            "options": {
+              "fields": {
+                "Time": {"aggregations": [], "operation": "groupby"},
+                "Value": {"aggregations": ["lastNotNull"], "operation": "aggregate"}
+              }
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "HVAC Health": 0,
+                "Dehumidifier Health": 1,
+                "Fan System Health": 2,
+                "Maintenance Score": 3,
+                "Performance Score": 4
+              },
+              "renameByName": {
+                "Maintenance Score": "Maintenance (%)",
+                "Performance Score": "Performance (%)"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "custom": {
+              "align": "center",
+              "displayMode": "color-background"
+            },
+            "mappings": [
+              {"options": {"Maintenance Due Soon": {"color": "yellow", "index": 0}}, "type": "value"},
+              {"options": {"High Usage": {"color": "orange", "index": 1}}, "type": "value"},
+              {"options": {"Normal": {"color": "green", "index": 2}}, "type": "value"},
+              {"options": {"Active": {"color": "blue", "index": 3}}, "type": "value"},
+              {"options": {"unknown": {"color": "gray", "index": 4}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 40},
+                {"color": "green", "value": 70},
+                {"color": "dark-green", "value": 90}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byRegexp", "options": "/.*%.*/"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "custom.displayMode", "value": "gradient-gauge"}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true
+        }
+      },
+      {
+        "id": 8,
+        "title": "System Performance Trends",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "climate_system_performance_score",
+            "legendFormat": "Overall Performance",
+            "refId": "A"
+          },
+          {
+            "expr": "climate_system_maintenance_score",
+            "legendFormat": "Maintenance Health",
+            "refId": "B"
+          },
+          {
+            "expr": "climate_energy_efficiency_score_2",
+            "legendFormat": "Energy Efficiency",
+            "refId": "C"
+          },
+          {
+            "expr": "system_uptime_percentage",
+            "legendFormat": "System Uptime",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 8,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "axisLabel": "Score (%)",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "max": 100,
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 40},
+                {"color": "green", "value": 70},
+                {"color": "dark-green", "value": 90}
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Overall Performance"},
+              "properties": [
+                {"id": "custom.lineWidth", "value": 3},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "table", "placement": "bottom", "values": ["min", "max", "mean", "last"]},
+          "displayMode": "line"
+        }
+      }
+    ]
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "schemaVersion": 30,
+  "version": 1,
+  "links": [
+    {
+      "title": "Home Overview",
+      "url": "/d/home-overview/",
+      "type": "dashboards"
+    },
+    {
+      "title": "Climate Deep Dive", 
+      "url": "/d/climate-deep-dive/",
+      "type": "dashboards"
+    },
+    {
+      "title": "Energy Management",
+      "url": "/d/energy-management/",
+      "type": "dashboards"
+    }
+  ]
+}

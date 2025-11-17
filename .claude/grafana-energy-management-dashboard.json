@@ -1,0 +1,587 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "HASSBOT Energy Management",
+    "tags": ["energy", "power", "cost", "efficiency"],
+    "style": "dark",
+    "timezone": "browser", 
+    "refresh": "2m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Real-Time Power Consumption",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "climate_system_energy_usage",
+            "legendFormat": "Total Climate System",
+            "refId": "A"
+          },
+          {
+            "expr": "dehumidifier_relay_power",
+            "legendFormat": "Dehumidifier Power",
+            "refId": "B"
+          },
+          {
+            "expr": "smart_outlet_office_lamp_power",
+            "legendFormat": "Office Lamp",
+            "refId": "C"
+          },
+          {
+            "expr": "smart_plug_console_lights_power",
+            "legendFormat": "Console Lights",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 100},
+                {"color": "orange", "value": 500},
+                {"color": "red", "value": 1000}
+              ]
+            },
+            "unit": "watt"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Total Climate System"},
+              "properties": [
+                {"id": "unit", "value": "kwatth"},
+                {"id": "custom.displayMode", "value": "gradient-gauge"},
+                {"id": "max", "value": 5}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Climate System Energy Breakdown",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "hvac_energy_daily",
+            "legendFormat": "HVAC",
+            "refId": "A"
+          },
+          {
+            "expr": "dehumidifier_energy_daily",
+            "legendFormat": "Dehumidifier",
+            "refId": "B"
+          },
+          {
+            "expr": "fans_energy_daily",
+            "legendFormat": "Fans",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "unit": "kwatth"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "pieType": "donut",
+          "tooltip": {"mode": "single", "sort": "none"},
+          "legend": {"displayMode": "list", "placement": "right", "values": ["value", "percent"]},
+          "displayLabels": ["name", "percent"]
+        }
+      },
+      {
+        "id": 3,
+        "title": "Daily Energy Cost Tracking",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "climate_energy_cost_analytics",
+            "legendFormat": "Monthly Projected Cost",
+            "refId": "A"
+          },
+          {
+            "expr": "climate_system_energy_usage * 0.12",
+            "legendFormat": "Daily Cost Estimate",
+            "refId": "B"
+          },
+          {
+            "expr": "energy_efficiency_advisor",
+            "legendFormat": "Efficiency Status",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "mappings": [
+              {"options": {"Low Load": {"color": "green", "index": 0}}, "type": "value"},
+              {"options": {"Moderate Load": {"color": "yellow", "index": 1}}, "type": "value"},
+              {"options": {"High Load": {"color": "red", "index": 2}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.5},
+                {"color": "orange", "value": 1},
+                {"color": "red", "value": 2}
+              ]
+            },
+            "unit": "currencyUSD"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Monthly Projected Cost"},
+              "properties": [
+                {"id": "unit", "value": "currencyUSD"},
+                {"id": "custom.displayMode", "value": "gradient-gauge"},
+                {"id": "max", "value": 150}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Efficiency Status"},
+              "properties": [
+                {"id": "unit", "value": "string"},
+                {"id": "custom.displayMode", "value": "color-text"}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "vertical",
+          "textMode": "auto",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "center"
+        }
+      },
+      {
+        "id": 4,
+        "title": "24-Hour Energy Consumption Trends",
+        "type": "timeseries",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 14},
+        "targets": [
+          {
+            "expr": "climate_system_energy_usage",
+            "legendFormat": "Total Climate Energy",
+            "refId": "A"
+          },
+          {
+            "expr": "hvac_energy_daily",
+            "legendFormat": "HVAC Energy",
+            "refId": "B"
+          },
+          {
+            "expr": "dehumidifier_energy_daily",
+            "legendFormat": "Dehumidifier Energy",
+            "refId": "C"
+          },
+          {
+            "expr": "fans_energy_daily",
+            "legendFormat": "Fans Energy",
+            "refId": "D"
+          },
+          {
+            "expr": "dehumidifier_relay_power / 1000",
+            "legendFormat": "Dehumidifier Power (kW)",
+            "refId": "E"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 8,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "axisLabel": "Energy (kWh)",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "kwatth"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Dehumidifier Power (kW)"},
+              "properties": [
+                {"id": "custom.axisPlacement", "value": "right"},
+                {"id": "unit", "value": "kilowatt"},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "purple"}},
+                {"id": "custom.drawStyle", "value": "points"},
+                {"id": "custom.pointSize", "value": 4}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Total Climate Energy"},
+              "properties": [
+                {"id": "custom.lineWidth", "value": 3},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "table", "placement": "bottom", "values": ["min", "max", "mean", "last"]},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Energy Efficiency Metrics",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "climate_energy_efficiency_score_2",
+            "legendFormat": "Efficiency Score",
+            "refId": "A"
+          },
+          {
+            "expr": "(thermostat_current_temperature - hvac_target_temperature) * climate_system_energy_usage",
+            "legendFormat": "Temperature-Energy Correlation",
+            "refId": "B"
+          },
+          {
+            "expr": "climate_system_energy_usage / (house_temperature - outdoor_temperature)",
+            "legendFormat": "Energy per Degree Differential",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null}
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Efficiency Score"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "max", "value": 100},
+                {"id": "min", "value": 0},
+                {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}},
+                {"id": "custom.lineWidth", "value": 3}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "none"},
+          "legend": {"displayMode": "list", "placement": "bottom"},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Individual Component Power Tracking",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "dehumidifier_relay_power",
+            "legendFormat": "Dehumidifier",
+            "refId": "A"
+          },
+          {
+            "expr": "smart_outlet_office_lamp_power",
+            "legendFormat": "Office Lamp",
+            "refId": "B"
+          },
+          {
+            "expr": "smart_plug_console_lights_power",
+            "legendFormat": "Console Lights",
+            "refId": "C"
+          },
+          {
+            "expr": "_75_the_frame_power",
+            "legendFormat": "75\" TV",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "barAlignment": 0,
+              "lineWidth": 2,
+              "fillOpacity": 8,
+              "gradientMode": "opacity",
+              "spanNulls": false,
+              "insertNulls": false,
+              "showPoints": "never",
+              "pointSize": 5,
+              "stacking": {"group": "A", "mode": "none"},
+              "axisPlacement": "auto",
+              "axisLabel": "Power (W)",
+              "scaleDistribution": {"type": "linear"},
+              "hideFrom": {"legend": false, "tooltip": false, "vis": false}
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "orange", "value": 100},
+                {"color": "red", "value": 200}
+              ]
+            },
+            "unit": "watt"
+          }
+        },
+        "options": {
+          "tooltip": {"mode": "multi", "sort": "desc"},
+          "legend": {"displayMode": "table", "placement": "bottom", "values": ["min", "max", "mean", "last"]},
+          "displayMode": "line"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Energy Optimization Recommendations",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "energy_efficiency_advisor",
+            "legendFormat": "Current Status",
+            "refId": "A"
+          },
+          {
+            "expr": "climate_energy_efficiency_score_2",
+            "legendFormat": "Efficiency Score",
+            "refId": "B"
+          },
+          {
+            "expr": "climate_system_energy_usage",
+            "legendFormat": "Current Usage",
+            "refId": "C"
+          },
+          {
+            "expr": "climate_system_energy_usage * 0.12 * 30",
+            "legendFormat": "Monthly Cost Est.",
+            "refId": "D"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "groupBy",
+            "options": {
+              "fields": {
+                "Time": {"aggregations": [], "operation": "groupby"},
+                "Value": {"aggregations": ["lastNotNull"], "operation": "aggregate"}
+              }
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {
+                "Current Status": 0,
+                "Efficiency Score": 1,
+                "Current Usage": 2,
+                "Monthly Cost Est.": 3
+              },
+              "renameByName": {
+                "Current Status": "Optimization Status",
+                "Efficiency Score": "Score (%)",
+                "Current Usage": "Usage (kWh)",
+                "Monthly Cost Est.": "Monthly Cost ($)"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "custom": {
+              "align": "center",
+              "displayMode": "color-background"
+            },
+            "mappings": [
+              {"options": {"Low Load": {"color": "green", "index": 0}}, "type": "value"},
+              {"options": {"Moderate Load": {"color": "yellow", "index": 1}}, "type": "value"},
+              {"options": {"High Load": {"color": "red", "index": 2}}, "type": "value"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 2},
+                {"color": "red", "value": 5}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Score (%)"},
+              "properties": [
+                {"id": "unit", "value": "percent"},
+                {"id": "thresholds", "value": {
+                  "steps": [
+                    {"color": "red", "value": null},
+                    {"color": "orange", "value": 40},
+                    {"color": "yellow", "value": 60},
+                    {"color": "green", "value": 80},
+                    {"color": "dark-green", "value": 95}
+                  ]
+                }}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Usage (kWh)"},
+              "properties": [
+                {"id": "unit", "value": "kwatth"}
+              ]
+            },
+            {
+              "matcher": {"id": "byName", "options": "Monthly Cost ($)"},
+              "properties": [
+                {"id": "unit", "value": "currencyUSD"}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true
+        }
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "0.12",
+          "value": "0.12"
+        },
+        "description": "Cost per kWh in USD",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Electricity Rate",
+        "multi": false,
+        "name": "electricity_rate",
+        "options": [
+          {"selected": false, "text": "0.10", "value": "0.10"},
+          {"selected": true, "text": "0.12", "value": "0.12"},
+          {"selected": false, "text": "0.15", "value": "0.15"},
+          {"selected": false, "text": "0.20", "value": "0.20"}
+        ],
+        "query": "0.10,0.12,0.15,0.20",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "schemaVersion": 30,
+  "version": 1,
+  "links": [
+    {
+      "title": "Home Overview",
+      "url": "/d/home-overview/",
+      "type": "dashboards"
+    },
+    {
+      "title": "Climate Deep Dive",
+      "url": "/d/climate-deep-dive/",
+      "type": "dashboards"
+    },
+    {
+      "title": "System Health",
+      "url": "/d/system-health/",
+      "type": "dashboards"
+    }
+  ]
+}

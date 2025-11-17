@@ -1,0 +1,46 @@
+# Home Assistant Panel iFrame Configuration for HASSBOT Grafana Dashboards
+# Add this to your configuration.yaml file in Home Assistant
+
+panel_iframe:
+  # HASSBOT Home Overview Dashboard
+  hassbot_overview:
+    title: "HASSBOT Overview"
+    icon: mdi:home-analytics
+    url: "http://192.168.88.125:3000/d/home-overview/hassbot-home-overview"
+    require_admin: false
+    
+  # HASSBOT Climate Deep Dive Dashboard  
+  hassbot_climate:
+    title: "Climate Analysis"
+    icon: mdi:thermometer-lines
+    url: "http://192.168.88.125:3000/d/climate-deep-dive/hassbot-climate-deep-dive"
+    require_admin: false
+    
+  # HASSBOT Energy Management Dashboard
+  hassbot_energy:
+    title: "Energy Management"
+    icon: mdi:lightning-bolt
+    url: "http://192.168.88.125:3000/d/energy-management/hassbot-energy-management"
+    require_admin: false
+    
+  # HASSBOT System Health Dashboard
+  hassbot_system:
+    title: "System Health"
+    icon: mdi:heart-pulse
+    url: "http://192.168.88.125:3000/d/system-health/hassbot-system-health"
+    require_admin: false
+    
+# Alternative configuration if you want admin-only access
+# panel_iframe:
+#   hassbot_overview:
+#     title: "HASSBOT Overview"
+#     icon: mdi:home-analytics
+#     url: "http://192.168.88.125:3000/d/home-overview/hassbot-home-overview"
+#     require_admin: true
+#     admin_sidebar: true
+    
+# Custom sidebar configuration (if needed)
+# sidebar:
+#   mode: hidden  # or visible
+#   title: "HASSBOT Analytics"
+#   icon: mdi:chart-line

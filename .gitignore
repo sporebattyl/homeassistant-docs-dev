@@ -1,0 +1,75 @@
+# Secrets and sensitive data
+secrets.env
+state/secrets.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+credentials.json
+.env
+.env.*
+
+# API tokens and credentials (should be in README_SECRETS.md as placeholders)
+# Users will need to configure these locally
+
+# Home Assistant specific
+home-assistant.log
+home-assistant_v2.db
+*.db-shm
+*.db-wal
+*.db-journal
+.uuid
+.storage/
+.cloud/
+tts/
+deps/
+.last-deployment
+
+# Temporary files
+temp/**/*
+!temp/.gitkeep
+!temp/sessions/.gitkeep
+!temp/analysis/.gitkeep
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+
+# Zigbee2MQTT
+zigbee2mqtt/log/
+zigbee2mqtt/data/database.db
+zigbee2mqtt/data/state.json
+
+# HACS and custom components (too large, reference only)
+www/community/
+custom_components/*/
+!custom_components/.gitkeep
+
+# Node modules and dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# IDE and editor files
+.vscode/
+.idea/
+*.code-workspace
+
+# Large log files
+*.log
+logs/
+
+# Deployment tracking (local only)
+.last-deployment
+deployment-history.log
+
+# Git hooks (will be tracked, but personalized)
+# Users may need to adjust paths
+
+# Archive directories with large content
+archive/**/*.zip
+archive/**/*.tar.gz
+consolidation_phases_*/legacy/
