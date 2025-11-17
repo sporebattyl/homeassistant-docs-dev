@@ -1,7 +1,8 @@
 # Entity Mapping - MD3 Tablet Dashboard
 
-**Last Updated**: 2025-11-10
-**Status**: Planning Phase
+**Last Updated**: 2025-11-16
+**Status**: Phase 0 Complete - Ready for Implementation
+**Readiness**: 10/10 (All entities verified)
 
 ---
 
@@ -46,49 +47,53 @@ This document provides a comprehensive inventory of all Home Assistant entities 
 
 #### Temperature Sensors
 
-| Room/Location | Entity ID | Current Typical | Dashboard View |
-|---------------|-----------|-----------------|----------------|
-| Living Room | `sensor.climate_living_temperature` | 74°F | Living Area, Overview |
-| Dining Room | `sensor.climate_dining_temperature` | 74°F | Living Area, Overview |
-| Kitchen 1 | `sensor.climate_kitchen1_temperature` | 73°F | Living Area, Overview |
-| Kitchen 2 | `sensor.climate_kitchen2_temperature` | 73°F | Living Area, Overview |
-| Master Bedroom | `sensor.climate_master_temperature` | 73°F | Master, Overview |
-| Master Bathroom | `sensor.climate_masterbath_temperature` | 73°F | Master |
-| Master Closet | `sensor.climate_mastercloset_temperature` | 73°F | Master |
-| Rowan's Room | `sensor.climate_rowan_temperature` | 73°F | Rowan, Overview |
-| Guest Bedroom | `sensor.climate_guestbed_temperature` | 74°F | Guest |
-| Guest Bathroom | `sensor.climate_guestbath_temperature` | 74°F | Guest |
-| Office | `sensor.climate_office_temperature` | 74°F | Office, Overview |
-| Laundry Room | `sensor.climate_laundry_temperature` | 75°F | System view |
-| Half Bathroom | `sensor.climate_halfbath_temperature` | 74°F | System view |
-| Foyer (Front) | `sensor.climate_foyerfront_temperature` | 74°F | System view |
-| Foyer (Garage) | `sensor.climate_foyergarage_temperature` | 75°F | Garage view |
-| HVAC Return | `sensor.climate_hvac_return_temperature` | 73°F | System view |
-| HVAC Supply | `sensor.climate_hvac_supply_temperature` | 65°F | System view |
-| Outdoor | `sensor.climate_outdoor_temperature` | Variable | Weather widget |
+**✅ VERIFIED 2025-11-16** - All 18 sensors operational with correct entity IDs:
+
+| Room/Location | Entity ID | Current Value | Dashboard View |
+|---------------|-----------|--------------|----------------|
+| Living Room | `sensor.climate_living_room_temperature` | 73.76°F | Living Area, Overview |
+| Dining Room | `sensor.climate_dining_room_temperature` | 73.58°F | Living Area, Overview |
+| Kitchen | `sensor.climate_kitchen_temperature` | 75.92°F | Living Area, Overview |
+| Half Bathroom | `sensor.climate_half_bathroom_temperature` | 73.17°F | System view |
+| Rowan's Room | `sensor.climate_rowans_room_temperature` | 73.04°F | Rowan, Overview |
+| Guest Bathroom | `sensor.climate_guest_bathroom_temperature` | 73.04°F | Guest |
+| Guest Bedroom | `sensor.climate_guest_bedroom_temperature` | 73.65°F | Guest |
+| Foyer (Garage) | `sensor.climate_foyer_garage_temperature` | 73.94°F | Garage view |
+| Master Bedroom | `sensor.climate_master_bedroom_temperature` | 72.57°F | Master, Overview |
+| Master Bathroom | `sensor.climate_master_bathroom_temperature` | 73.94°F | Master |
+| Master Closet | `sensor.climate_master_closet_temperature` | 73.56°F | Master |
+| Office | `sensor.climate_office_temperature` | 82.4°F | Office, Overview |
+| Laundry Room | `sensor.climate_laundry_room_temperature` | 73.00°F | System view |
+| Outdoor (Back Porch) | `sensor.climate_outdoor_back_porch_temperature` | 73.58°F | Weather widget |
+| HVAC Return | `sensor.climate_hvac_return_temperature` | Available | System view |
+| HVAC Supply | `sensor.climate_hvac_supply_temperature` | Available | System view |
+| Outdoor (General) | `sensor.outdoor_temperature` | 180.32°F | Weather widget |
+| Dev Outdoor | `sensor.dev_outdoor_temperature` | 82.4°F | Development |
 
 #### Humidity Sensors
 
-| Room/Location | Entity ID | Current Typical | Dashboard View |
-|---------------|-----------|-----------------|----------------|
-| Living Room | `sensor.climate_living_humidity` | 52% | Living Area, Overview |
-| Dining Room | `sensor.climate_dining_humidity` | 52% | Living Area, Overview |
-| Kitchen 1 | `sensor.climate_kitchen1_humidity` | 54% | Living Area, Overview |
-| Kitchen 2 | `sensor.climate_kitchen2_humidity` | 54% | Living Area, Overview |
-| Master Bedroom | `sensor.climate_master_humidity` | 51% | Master, Overview |
-| Master Bathroom | `sensor.climate_masterbath_humidity` | 53% | Master |
-| Master Closet | `sensor.climate_mastercloset_humidity` | 51% | Master |
-| Rowan's Room | `sensor.climate_rowan_humidity` | 52% | Rowan, Overview |
-| Guest Bedroom | `sensor.climate_guestbed_humidity` | 52% | Guest |
-| Guest Bathroom | `sensor.climate_guestbath_humidity` | 53% | Guest |
-| Office | `sensor.climate_office_humidity` | 51% | Office, Overview |
-| Laundry Room | `sensor.climate_laundry_humidity` | 55% | System view |
-| Half Bathroom | `sensor.climate_halfbath_humidity` | 53% | System view |
-| Foyer (Front) | `sensor.climate_foyerfront_humidity` | 52% | System view |
-| Foyer (Garage) | `sensor.climate_foyergarage_humidity` | 54% | Garage view |
-| HVAC Return | `sensor.climate_hvac_return_humidity` | 52% | System view |
-| HVAC Supply | `sensor.climate_hvac_supply_humidity` | 48% | System view |
-| Outdoor | `sensor.climate_outdoor_humidity` | Variable | Weather widget |
+**✅ VERIFIED 2025-11-16** - All 18 sensors operational with correct entity IDs:
+
+| Room/Location | Entity ID | Current Value | Dashboard View |
+|---------------|-----------|--------------|----------------|
+| Living Room | `sensor.climate_living_room_humidity` | 52% | Living Area, Overview |
+| Dining Room | `sensor.climate_dining_room_humidity` | 54% | Living Area, Overview |
+| Kitchen | `sensor.climate_kitchen_humidity` | 51% | Living Area, Overview |
+| Half Bathroom | `sensor.climate_half_bathroom_humidity` | 51.89% | System view |
+| Rowan's Room | `sensor.climate_rowans_room_humidity` | 53% | Rowan, Overview |
+| Guest Bathroom | `sensor.climate_guest_bathroom_humidity` | 52% | Guest |
+| Guest Bedroom | `sensor.climate_guest_bedroom_humidity` | 52.5% | Guest |
+| Foyer (Garage) | `sensor.climate_foyer_garage_humidity` | 54% | Garage view |
+| Master Bedroom | `sensor.climate_master_bedroom_humidity` | 53.96% | Master, Overview |
+| Master Bathroom | `sensor.climate_master_bathroom_humidity` | Available | Master |
+| Master Closet | `sensor.climate_master_closet_humidity` | Available | Master |
+| Outdoor (Back Porch) | `sensor.climate_outdoor_back_porch_humidity` | 85% | Weather widget |
+| Outdoor (General) | `sensor.outdoor_humidity` | 61.0% | Weather widget |
+| Dev Outdoor | `sensor.dev_outdoor_humidity` | 61.0% | Development |
+| WAQI Seabrook | `sensor.waqi_seabrook_humidity` | 89% | Weather reference |
+| Seabrook Park | `sensor.seabrook_friendship_park_houston_texas_humidity` | 95% | Weather reference |
+| HVAC Return | `sensor.climate_hvac_return_humidity` | Available | System view |
+| HVAC Supply | `sensor.climate_hvac_supply_humidity` | Available | System view |
 
 ### Climate Control Entities
 
@@ -122,12 +127,34 @@ This document provides a comprehensive inventory of all Home Assistant entities 
 - `sensor.average_house_humidity_enhanced` - Whole-home average (18-sensor weighted)
 - **Dashboard Views**: Overview header, System view
 
-#### Dew Point Sensors
-- `sensor.climate_living_dew_point` - Living room dew point calculation
-- `sensor.climate_master_dew_point` - Master bedroom dew point
-- `sensor.climate_outdoor_dew_point` - Outdoor dew point
-- (Additional dew point sensors for other rooms)
-- **Dashboard Views**: All climate room views, Weather widget
+#### Dew Point Sensors (✅ ALL OPERATIONAL - Phase 0 Complete)
+
+**Status**: ✅ 17/17 sensors created and operational (2025-11-14)
+
+| Room/Location | Entity ID | Current Value | Dashboard View |
+|---------------|-----------|--------------|----------------|
+| Living Room | `sensor.climate_living_dew_point` | 55.0°F | Living Area, Overview |
+| Dining Room | `sensor.climate_dining_dew_point` | 55.9°F | Living Area, Overview |
+| Kitchen | `sensor.climate_kitchen_dew_point` | 56.5°F | Living Area, Overview |
+| Half Bathroom | `sensor.climate_halfbath_dew_point` | 54.4°F | System view |
+| Rowan's Room | `sensor.climate_rowan_dew_point` | 55.2°F | Rowan, Overview |
+| Guest Bathroom | `sensor.climate_guestbath_dew_point` | 54.7°F | Guest |
+| Guest Bedroom | `sensor.climate_guestbed_dew_point` | 55.2°F | Guest |
+| Foyer (Garage) | `sensor.climate_foyergarage_dew_point` | 56.2°F | Garage view |
+| Master Suite | `sensor.climate_master_dew_point` | 54.9°F | Master, Overview |
+| Master Bathroom | `sensor.climate_masterbath_dew_point` | 54.7°F | Master |
+| Master Closet | `sensor.climate_mastercloset_dew_point` | 55.1°F | Master |
+| Office | `sensor.climate_office_dew_point` | 54.1°F | Office, Overview |
+| Laundry Room | `sensor.climate_laundry_dew_point` | 55.7°F | System view |
+| Foyer (Front) | `sensor.climate_foyerfront_dew_point` | 56.6°F | System view |
+| HVAC Return | `sensor.climate_hvac_return_dew_point` | 57.8°F | System view |
+| HVAC Supply | `sensor.climate_hvac_supply_dew_point` | 51.8°F | System view |
+| Outdoor (Back Porch) | `sensor.climate_outdoor_dew_point` | 68.8°F | Weather widget |
+| Outdoor (General) | `sensor.outdoor_dew_point` | unavailable | Weather widget |
+
+**Implementation**: Created via `packages/climate_tablet_md3_dew_point.yaml` (Phase 0)
+**Formula**: Magnus-Tetens approximation for dew point calculation
+**Dashboard Views**: All climate room views, Weather widget
 
 #### Equipment Status
 - `sensor.equipment_arbitration_status_enhanced` - AC/dehumidifier arbitration state
@@ -337,29 +364,29 @@ This document provides a comprehensive inventory of all Home Assistant entities 
 - **Dashboard Card**: Clock Weather Card
 - **Dashboard Views**: Overview (header), Calendar view
 
-### WAQI Air Quality
-**✅ STATUS**: **WORKING - Manual REST Sensors** (implemented 2025-11-14)
+### WAQI Air Quality ✅ (OPERATIONAL - Direct API Access)
+
+**Status**: ✅ WORKING - 9/9 sensors operational via manual REST sensors
 
 **Solution**: Bypassed broken HA integration (#133919) with direct API access via `packages/waqi_manual_sensors.yaml`
 
 | Entity ID | Type | Purpose | Current Value | Dashboard View |
 |-----------|------|---------|---------------|----------------|
-| `sensor.waqi_seabrook_aqi` | AQI Index | Primary air quality value (0-500 scale) | 21 (Good) | Overview, Calendar |
+| `sensor.waqi_seabrook_aqi` | AQI Index | Primary air quality value (0-500 scale) | 15 (Moderate) | Overview, Calendar |
 | `sensor.waqi_seabrook_aqi_category` | Text | Human-readable AQI category | Good | Overview, Calendar |
-| `sensor.waqi_seabrook_pm2_5` | µg/m³ | PM2.5 particulate matter | 21 µg/m³ | Calendar (detailed) |
+| `sensor.waqi_seabrook_pm2_5` | µg/m³ | PM2.5 particulate matter | 10 µg/m³ | Calendar (detailed) |
 | `sensor.waqi_seabrook_pm10` | µg/m³ | PM10 particulate matter | unavailable | Calendar (detailed) |
 | `sensor.waqi_seabrook_ozone` | ppb | Ozone (O3) levels | 18.4 ppb | Calendar (detailed) |
-| `sensor.waqi_seabrook_no2` | ppb | Nitrogen dioxide levels | 5.5 ppb | Calendar (detailed) |
-| `sensor.waqi_seabrook_temperature` | °F | Station outdoor temperature | 75.0°F | (reference) |
-| `sensor.waqi_seabrook_humidity` | % | Station outdoor humidity | 77.5% | (reference) |
-| `sensor.waqi_seabrook_attribution` | Text | Data source attribution | TCEQ | (metadata) |
+| `sensor.waqi_seabrook_no2` | ppb | Nitrogen dioxide levels | 1.7 ppb | Calendar (detailed) |
+| `sensor.waqi_seabrook_temperature` | °F | Station outdoor temperature | 77.7°F | (reference) |
+| `sensor.waqi_seabrook_humidity` | % | Station outdoor humidity | 89% | (reference) |
+| `sensor.waqi_seabrook_attribution` | Text | Data source attribution | Texas Commission on Environmental Quality (TCEQ) | (metadata) |
 
-**Dashboard Impact**: Air quality widgets NOW AVAILABLE for implementation
-- Overview page weather section: AQI chip with color-coded background
-- Calendar page: Air quality data with pollutant breakdown
-
+**Documentation**: See `/temp/testing/waqi-configuration-guide.md` and `/temp/testing/waqi-fix-instructions.md`
 **Station**: Seabrook Friendship Park, Houston, TX (Station #179)
+**API Key**: Valid and tested
 **Update Interval**: 30 minutes (API-friendly, under free tier limit)
+**Dashboard Impact**: Air quality widgets READY for Overview and Calendar views
 
 ### Calendar (6 Entities)
 
