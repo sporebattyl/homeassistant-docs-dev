@@ -27,11 +27,8 @@ tts/
 deps/
 .last-deployment
 
-# Temporary files
-temp/**/*
-!temp/.gitkeep
-!temp/sessions/.gitkeep
-!temp/analysis/.gitkeep
+# Temporary files (tracked for CLI/Web collaboration)
+# temp/ directory contents ARE tracked to enable sharing between environments
 *.tmp
 *.bak
 *.swp
