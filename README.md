@@ -75,6 +75,40 @@ bash scripts/sync-to-docs-dev.sh
 
 ---
 
+## CLI/Web Collaboration (NEW!)
+
+**The `temp/` directory is now tracked**, enabling seamless collaboration between environments:
+
+### Start in Web, finish in CLI
+
+1. **In Claude Code Web**: Plan and design in `temp/sessions/`
+2. **Commit and push**: Sync to GitHub
+3. **On local CLI**: Pull and implement with MCP tools
+4. **Push results back**: Share findings in `temp/analysis/`
+
+### Example workflow
+
+**Web environment** (documentation, planning):
+```markdown
+# temp/sessions/new-feature-plan.md
+- Research existing patterns
+- Design new automation
+- Document approach
+```
+
+**Local CLI** (implementation with API access):
+```bash
+bash scripts/sync-from-docs-dev.sh  # Pull the plan
+# Use MCP tools to implement
+mcp__ha-entity-search__get_state(...)
+# Save results
+echo "Implementation complete" > ../homeassistant-docs-dev/temp/analysis/results.md
+```
+
+See `temp/README.md` for detailed workflows and best practices.
+
+---
+
 ## Quick Start
 
 **1. Clone this repo in Claude Code Web**:
